@@ -1,0 +1,6 @@
+{
+  "name": "VisionCut AI",
+  "description": "Premium AI Video Editor UI/UX Design with dark theme and glassmorphism",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
