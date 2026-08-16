@@ -88,4 +88,3 @@ The output files will be created in:
 
 ## 📄 License & Attribution
 Designed & Engineered with Google AI Studio & Jetpack Compose.
-fix: regenerate official gradle wrapper v8.7
