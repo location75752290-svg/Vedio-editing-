@@ -8,5 +8,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Gradle Wrapper Validation
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v3
         continue-on-error: true
