@@ -15,4 +15,5 @@ debug.keystore
 *.aab
 *.apk
 *.zip
+app/src/main/assets/secrets_*.json
 
