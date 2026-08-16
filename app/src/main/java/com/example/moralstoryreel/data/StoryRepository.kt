@@ -1,10 +1,7 @@
 package com.example.moralstoryreel.data
 
-import android.content.Context
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -13,96 +10,158 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-data class Story(
-    val title: String,
-    val script: String,
-    val imagePrompts: List<String>
+data class StoryScene(
+    val sceneNumber: Int,
+    val narration: String,
+    val visualPrompt: String,
+    val dialogue: String? = null
 )
 
-class StoryRepository(private val context: Context) {
+data class MoralStory(
+    val title: String,
+    val theme: String,
+    val targetAudience: String,
+    val scenes: List<StoryScene>,
+    val moralLesson: String,
+    val hashtags: List<String>
+)
 
-    companion object {
-        private const val TAG = "StoryRepository"
-        private const val GEMINI_MODEL = "gemini-flash-latest"
-        private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-    }
+class StoryRepository {
 
-    private val httpClient = OkHttpClient.Builder()
+    private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    private fun parseStoryResponse(jsonString: String): Story {
-        val json = Json { ignoreUnknownKeys = true }
-        val root = json.parseToJsonElement(jsonString).jsonObject
-        val text = root["candidates"]?.jsonArray?.get(0)?.jsonObject
-            ?.get("content")?.jsonObject
-            ?.get("parts")?.jsonArray?.get(0)?.jsonObject
-            ?.get("text")?.jsonPrimitive?.content ?: ""
-
-        // Gemini sometimes returns JSON inside ```json ... ```
-        val cleanJson = text.replace("```json", "").replace("```", "").trim()
-        val storyJson = json.parseToJsonElement(cleanJson).jsonObject
-
-        return Story(
-            title = storyJson["title"]?.jsonPrimitive?.content ?: "Untitled Story",
-            script = storyJson["script"]?.jsonPrimitive?.content ?: "",
-            imagePrompts = storyJson["image_prompts"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-        )
-    }
-
-    suspend fun generateStory(topic: String): Story = withContext(Dispatchers.IO) {
-        val apiKey = SecretManager.getGeminiApiKey(context)
-        if (apiKey.isEmpty() || apiKey.startsWith("MY_GEMINI_API_KEY") || apiKey.startsWith("PASTE_YOUR_") || apiKey.startsWith("YOUR_")) {
-            throw IllegalStateException("Valid Gemini API key (GEMINI_API_KEY) not found in Secrets.")
-        }
-
-        val prompt = """
-            Write a 30 second Urdu moral story about $topic.
-            Return ONLY a valid JSON object matching this exact structure:
-            {
-              "title": "Urdu story title here",
-              "script": "Complete 30-second Urdu story narration here",
-              "image_prompts": [
-                "Detailed English image prompt for scene 1",
-                "Detailed English image prompt for scene 2",
-                "Detailed English image prompt for scene 3"
-              ]
+    suspend fun generateStory(
+        topic: String,
+        targetDurationSeconds: Int = 45,
+        language: String = "English",
+        style: String = "Inspiring 3D Animation Style"
+    ): Result<MoralStory> = withContext(Dispatchers.IO) {
+        try {
+            val apiKey = SecretManager.getGeminiApiKey()
+            if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+                return@withContext Result.failure(
+                    IllegalStateException("Gemini API Key missing or invalid. Please configure it in Secrets.")
+                )
             }
-            Do not include markdown code block syntax (like ```json or ```). Return pure JSON.
-        """.trimIndent()
 
-        val partsArray = JSONArray().put(JSONObject().put("text", prompt))
-        val contentsArray = JSONArray().put(JSONObject().put("parts", partsArray))
+            val prompt = """
+                You are a master moral story scriptwriter for viral social media vertical video reels (TikTok, Shorts, Reels).
+                Create a captivating, high-impact moral story reel script based on the following input:
+                - Topic/Prompt: $topic
+                - Target Duration: ~$targetDurationSeconds seconds (around 4-6 concise scenes)
+                - Language: $language
+                - Visual Artistic Style: $style
 
-        val generationConfig = JSONObject().apply {
-            put("temperature", 0.7)
-            put("responseMimeType", "application/json")
+                Respond ONLY with a valid JSON object matching this structure:
+                {
+                  "title": "Short Catchy Reel Title",
+                  "theme": "Core Theme (e.g., Kindness, Honesty, Hard Work)",
+                  "targetAudience": "All Ages / Youth / Kids",
+                  "scenes": [
+                    {
+                      "sceneNumber": 1,
+                      "narration": "Voiceover narration for this scene",
+                      "visualPrompt": "Detailed AI image generation prompt for this scene's background/characters",
+                      "dialogue": "Optional dialogue if any, or null"
+                    }
+                  ],
+                  "moralLesson": "One punchy sentence highlighting the takeaway message.",
+                  "hashtags": ["#MoralStory", "#Shorts", "#Inspiration", "#Wisdom"]
+                }
+            """.trimIndent()
+
+            val jsonBody = JSONObject().apply {
+                val contents = JSONArray().apply {
+                    val contentObj = JSONObject().apply {
+                        val parts = JSONArray().apply {
+                            put(JSONObject().put("text", prompt))
+                        }
+                        put("parts", parts)
+                    }
+                    put(contentObj)
+                }
+                put("contents", contents)
+                
+                val genConfig = JSONObject().apply {
+                    put("temperature", 0.7)
+                    put("topP", 0.95)
+                }
+                put("generationConfig", genConfig)
+            }
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = jsonBody.toString().toRequestBody(mediaType)
+
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
+
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseString = response.body?.string() ?: ""
+
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(
+                    Exception("Gemini API Error ${response.code}: $responseString")
+                )
+            }
+
+            val jsonResp = JSONObject(responseString)
+            val candidates = jsonResp.optJSONArray("candidates")
+            val firstCandidate = candidates?.optJSONObject(0)
+            val content = firstCandidate?.optJSONObject("content")
+            val parts = content?.optJSONArray("parts")
+            val rawText = parts?.optJSONObject(0)?.optString("text") ?: ""
+
+            val cleanedJsonText = rawText
+                .trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+
+            val storyJson = JSONObject(cleanedJsonText)
+            val scenesArray = storyJson.getJSONArray("scenes")
+            val scenesList = mutableListOf<StoryScene>()
+
+            for (i in 0 until scenesArray.length()) {
+                val sceneObj = scenesArray.getJSONObject(i)
+                scenesList.add(
+                    StoryScene(
+                        sceneNumber = sceneObj.optInt("sceneNumber", i + 1),
+                        narration = sceneObj.optString("narration", ""),
+                        visualPrompt = sceneObj.optString("visualPrompt", ""),
+                        dialogue = if (sceneObj.has("dialogue") && !sceneObj.isNull("dialogue")) sceneObj.optString("dialogue") else null
+                    )
+                )
+            }
+
+            val hashtagsArray = storyJson.optJSONArray("hashtags")
+            val hashtagsList = mutableListOf<String>()
+            if (hashtagsArray != null) {
+                for (i in 0 until hashtagsArray.length()) {
+                    hashtagsList.add(hashtagsArray.getString(i))
+                }
+            }
+
+            val story = MoralStory(
+                title = storyJson.optString("title", "Moral Story Reel"),
+                theme = storyJson.optString("theme", "Wisdom"),
+                targetAudience = storyJson.optString("targetAudience", "General"),
+                scenes = scenesList,
+                moralLesson = storyJson.optString("moralLesson", ""),
+                hashtags = hashtagsList
+            )
+
+            Result.success(story)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-
-        val requestJson = JSONObject().apply {
-            put("contents", contentsArray)
-            put("generationConfig", generationConfig)
-        }
-
-        val requestBody = requestJson.toString()
-            .toRequestBody("application/json; charset=utf-8".toMediaType())
-
-        val url = "$BASE_URL/$GEMINI_MODEL:generateContent?key=$apiKey"
-
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody)
-            .build()
-
-        val response = httpClient.newCall(request).execute()
-        val responseBodyString = response.body?.string()
-
-        if (!response.isSuccessful || responseBodyString.isNullOrEmpty()) {
-            throw RuntimeException("Gemini API call failed (HTTP ${response.code}): $responseBodyString")
-        }
-
-        parseStoryResponse(responseBodyString)
     }
 }
