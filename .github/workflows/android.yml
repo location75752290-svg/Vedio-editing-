@@ -1,11 +1,8 @@
-name: Android Build
+name: Android Build Fix
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
@@ -17,17 +14,16 @@ jobs:
 
     # STEP 1: Delete old Gradle Wrapper
     - name: Delete old Gradle Wrapper
-      run: |
-        rm -rf gradle/wrapper/gradle-wrapper.jar
-        rm -rf gradle/wrapper/gradle-wrapper.properties
+      run: rm -rf gradle/wrapper/
 
-    # STEP 2: Setup JDK and generate fresh valid Gradle Wrapper
+    # STEP 2: Java 17 Setup
     - name: Setup JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
+    # STEP 3: Gradle 8.5 Setup + generate new wrapper
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
@@ -36,9 +32,12 @@ jobs:
     - name: Generate new Gradle Wrapper
       run: gradle wrapper --gradle-version 8.5 --distribution-type all
 
-    # STEP 3: Build Android Release
-    - name: Make Gradlew Executable
-      run: chmod +x gradlew
+    # STEP 4: Fix Android Gradle Plugin Version
+    - name: Fix Android Gradle Plugin Version
+      run: |
+        sed -i 's/com.android.application.*version.*9.1.1/com.android.application" version "8.3.2"/g' settings.gradle.kts
+        sed -i 's/com.android.application.*version.*9.1.1/com.android.application" version "8.3.2"/g' build.gradle.kts
 
-    - name: Build with Gradle
-      run: ./gradlew assembleRelease
+    # STEP 5: Build
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
