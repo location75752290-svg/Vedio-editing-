@@ -30,11 +30,8 @@ jobs:
           base64 -d debug.keystore.base64 > debug.keystore || true
         fi
 
-    - name: Make Gradlew Executable
-      run: chmod +x gradlew
-
     - name: Build Release AAB
-      run: ./gradlew :app:bundleRelease --no-daemon
+      run: gradle :app:bundleRelease --no-daemon
 
     - name: Upload Release AAB Artifact
       uses: actions/upload-artifact@v4
