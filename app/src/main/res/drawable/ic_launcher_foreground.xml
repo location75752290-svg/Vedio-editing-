@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/visioncut_app_icon_1787164029593"
+        android:drawable="@drawable/ic_vision_cut_1787138156155"
         android:gravity="center" />
 </layer-list>
