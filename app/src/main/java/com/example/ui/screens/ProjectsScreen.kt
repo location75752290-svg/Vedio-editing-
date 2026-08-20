@@ -83,12 +83,20 @@ data class UserProjectItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectsScreen(
-    onOpenProject: (UserProjectItem) -> Unit,
+    onOpenProject: (UserProjectItem) -> Unit = {},
+    onLoadVcpProject: (com.example.domain.model.VisionCutProjectData) -> Unit = {},
+    onOpenProjectFile: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var isGridView by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf("All") }
     var activeMenuProjectId by remember { mutableStateOf<String?>(null) }
+    var vcpProjects by remember { mutableStateOf<List<com.example.domain.model.VisionCutProjectData>>(emptyList()) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        vcpProjects = com.example.engine.ProjectFileManager.createDemoProjectsIfEmpty(context)
+    }
 
     val filters = listOf("All", "Drafts", "Rendered", "Favorites")
 
@@ -165,27 +173,43 @@ fun ProjectsScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${projectsList.size} Saved Projects • Cloud Sync Enabled",
+                    text = "${vcpProjects.size.coerceAtLeast(projectsList.size)} Saved .vcp Projects",
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
             }
 
-            // Grid / List Toggle Button
-            Box(
-                modifier = Modifier
-                    .testTag("projects_view_toggle")
-                    .clip(CircleShape)
-                    .background(CharcoalSurface)
-                    .clickable { isGridView = !isGridView }
-                    .padding(10.dp)
-            ) {
-                Icon(
-                    imageVector = if (isGridView) Icons.Default.List else Icons.Default.GridView,
-                    contentDescription = "Toggle View",
-                    tint = TextPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Open .vcp File Button
+                Box(
+                    modifier = Modifier
+                        .testTag("open_vcp_file_btn")
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(ElectricBlue, DeepPurple))
+                        )
+                        .clickable { onOpenProjectFile() }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text("Open .vcp", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Grid / List Toggle Button
+                Box(
+                    modifier = Modifier
+                        .testTag("projects_view_toggle")
+                        .clip(CircleShape)
+                        .background(CharcoalSurface)
+                        .clickable { isGridView = !isGridView }
+                        .padding(10.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isGridView) Icons.Default.List else Icons.Default.GridView,
+                        contentDescription = "Toggle View",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 

@@ -78,6 +78,7 @@ data class AiToolData(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiToolsScreen(
+    onOpenRemoveBg: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedToolForModal by remember { mutableStateOf<AiToolData?>(null) }
@@ -224,7 +225,13 @@ fun AiToolsScreen(
                     modifier = Modifier
                         .testTag("ai_tool_${tool.id}")
                         .fillMaxWidth()
-                        .clickable { selectedToolForModal = tool },
+                        .clickable {
+                            if (tool.id == "bg_remover") {
+                                onOpenRemoveBg()
+                            } else {
+                                selectedToolForModal = tool
+                            }
+                        },
                     shape = RoundedCornerShape(22.dp)
                 ) {
                     Column(
@@ -389,7 +396,13 @@ fun AiToolsScreen(
 
                 GradientButton(
                     text = "Launch ${tool.title}",
-                    onClick = { selectedToolForModal = null },
+                    onClick = {
+                        val toolId = tool.id
+                        selectedToolForModal = null
+                        if (toolId == "bg_remover") {
+                            onOpenRemoveBg()
+                        }
+                    },
                     modifier = Modifier
                         .testTag("ai_tool_modal_launch")
                         .fillMaxWidth(),

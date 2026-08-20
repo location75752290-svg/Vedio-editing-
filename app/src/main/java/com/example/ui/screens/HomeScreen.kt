@@ -32,7 +32,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VideoCall
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -111,13 +113,23 @@ data class AiToolPreviewData(
 @Composable
 fun HomeScreen(
     onNewProjectClick: () -> Unit,
+    onOpenProjectFile: () -> Unit = {},
+    onLoadVcpProject: (com.example.domain.model.VisionCutProjectData) -> Unit = {},
     onNavigateToTemplates: () -> Unit,
     onNavigateToAiTools: () -> Unit,
     onNavigateToProjects: () -> Unit,
+    onNavigateToRemoveBg: () -> Unit = {},
+    onOpenVideoPicker: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var selectedAspectRatio by remember { mutableStateOf("9:16") }
     var showProjectSheet by remember { mutableStateOf(false) }
+    var vcpProjectsList by remember { mutableStateOf<List<com.example.domain.model.VisionCutProjectData>>(emptyList()) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        vcpProjectsList = com.example.engine.ProjectFileManager.createDemoProjectsIfEmpty(context)
+    }
 
     val aspectRatios = listOf(
         AspectRatioItem("Shorts/TikTok", "9:16"),
@@ -208,7 +220,7 @@ fun HomeScreen(
                 // App Logo Icon with Glow
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(38.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             Brush.linearGradient(listOf(ElectricBlue, DeepPurple))
@@ -216,20 +228,14 @@ fun HomeScreen(
                         .padding(2.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_vision_cut_1787138156155),
+                        contentDescription = "VisionCutAI App Icon",
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(ObsidianBackground),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = "Logo",
-                            tint = ElectricBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
@@ -441,7 +447,7 @@ fun HomeScreen(
                                                 )
                                             )
                                         )
-                                        .clickable { onNewProjectClick() }
+                                        .clickable { onOpenVideoPicker() }
                                         .padding(3.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -468,7 +474,12 @@ fun HomeScreen(
                                     }
                                 }
 
-                                Column(modifier = Modifier.padding(start = 14.dp)) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(start = 14.dp)
+                                        .testTag("start_project_button")
+                                        .clickable { onOpenVideoPicker() }
+                                ) {
                                     Text(
                                         text = "Start New Project",
                                         color = TextPrimary,
@@ -640,92 +651,127 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // Three Larger Premium Action Buttons: Import Video, Camera, AI Generate ✨
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Action 1: Import Video
-                            Box(
-                                modifier = Modifier
-                                    .testTag("home_import_video")
-                                    .weight(1.1f)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(
-                                        Brush.horizontalGradient(listOf(ElectricBlue, DeepPurple))
-                                    )
-                                    .clickable { onNewProjectClick() }
-                                    .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center
+                        // Four Premium Action Buttons: Import Video, Open .vcp, Camera, AI Generate ✨
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.FolderOpen,
-                                        contentDescription = null,
-                                        tint = TextPrimary,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Text(
-                                        text = " Import Video",
-                                        color = TextPrimary,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                // Action 1: Import Video
+                                Box(
+                                    modifier = Modifier
+                                        .testTag("home_import_video")
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(
+                                            Brush.horizontalGradient(listOf(ElectricBlue, DeepPurple))
+                                        )
+                                        .clickable { onOpenVideoPicker() }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.FolderOpen,
+                                            contentDescription = null,
+                                            tint = TextPrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = " Import Video",
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                // Action 2: Open .vcp Project File
+                                Box(
+                                    modifier = Modifier
+                                        .testTag("home_open_vcp_project")
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(CharcoalSurfaceVariant.copy(alpha = 0.9f))
+                                        .border(1.dp, ElectricBlue.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                                        .clickable { onOpenProjectFile() }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.FolderOpen,
+                                            contentDescription = null,
+                                            tint = ElectricBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = " Open .vcp",
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
 
-                            // Action 2: Camera
-                            Box(
-                                modifier = Modifier
-                                    .weight(0.9f)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(CharcoalSurfaceVariant.copy(alpha = 0.9f))
-                                    .border(1.dp, ElectricBlue.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
-                                    .clickable { onNewProjectClick() }
-                                    .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.CameraAlt,
-                                        contentDescription = null,
-                                        tint = RadiantPink,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Text(
-                                        text = " Camera",
-                                        color = TextPrimary,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                // Action 3: Camera
+                                Box(
+                                    modifier = Modifier
+                                        .weight(0.9f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(CharcoalSurfaceVariant.copy(alpha = 0.9f))
+                                        .border(1.dp, RadiantPink.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                        .clickable { onNewProjectClick() }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.CameraAlt,
+                                            contentDescription = null,
+                                            tint = RadiantPink,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = " Camera",
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
-                            }
 
-                            // Action 3: AI Generate ✨
-                            Box(
-                                modifier = Modifier
-                                    .weight(1.2f)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(
-                                        Brush.horizontalGradient(listOf(RadiantPink, DeepPurple))
-                                    )
-                                    .clickable { onNavigateToAiTools() }
-                                    .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = TextPrimary,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Text(
-                                        text = " AI Generate ✨",
-                                        color = TextPrimary,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                // Action 4: AI Generate ✨
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1.1f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(
+                                            Brush.horizontalGradient(listOf(RadiantPink, DeepPurple))
+                                        )
+                                        .clickable { onNavigateToAiTools() }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = TextPrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = " AI Generate ✨",
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1459,83 +1505,187 @@ fun HomeScreen(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(recentProjects) { project ->
-                GlassCard(
-                    modifier = Modifier
-                        .width(220.dp)
-                        .clickable { showProjectSheet = true },
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(125.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(id = project.imageRes),
-                                contentDescription = project.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            // Play Overlay Button
+            if (vcpProjectsList.isNotEmpty()) {
+                items(vcpProjectsList) { vcpProj ->
+                    GlassCard(
+                        modifier = Modifier
+                            .width(220.dp)
+                            .clickable { onLoadVcpProject(vcpProj) },
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column {
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(CharcoalSurface.copy(alpha = 0.8f)),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .height(125.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Play",
-                                    tint = TextPrimary,
-                                    modifier = Modifier.size(20.dp)
+                                Image(
+                                    painter = painterResource(
+                                        id = if (vcpProj.id.contains("sunset")) R.drawable.thumb_sunset_1785491163192 else R.drawable.thumb_cyberpunk_1785491147932
+                                    ),
+                                    contentDescription = vcpProj.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
+                                // Play Overlay Button
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(CharcoalSurface.copy(alpha = 0.8f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = TextPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                // .vcp Badge
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(8.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(ElectricBlue)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = ".VCP",
+                                        color = TextPrimary,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                // Duration Pill
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(8.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color.Black.copy(alpha = 0.75f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    val sec = (vcpProj.videoDurationMs / 1000)
+                                    Text(
+                                        text = String.format("%02d:%02d", sec / 60, sec % 60),
+                                        color = TextPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
-                            // Duration Pill
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(8.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.Black.copy(alpha = 0.75f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
+
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = project.duration,
+                                    text = vcpProj.name,
                                     color = TextPrimary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "${vcpProj.speed}x Speed",
+                                        color = NeonIndigo,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = com.example.engine.ProjectFileManager.formatLastEditedTime(vcpProj.lastModifiedMs),
+                                        color = TextMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
                         }
-
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = project.title,
-                                color = TextPrimary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                    }
+                }
+            } else {
+                items(recentProjects) { project ->
+                    GlassCard(
+                        modifier = Modifier
+                            .width(220.dp)
+                            .clickable { showProjectSheet = true },
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(125.dp)
                             ) {
-                                Text(
-                                    text = project.resolution,
-                                    color = NeonIndigo,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                Image(
+                                    painter = painterResource(id = project.imageRes),
+                                    contentDescription = project.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
+                                // Play Overlay Button
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(CharcoalSurface.copy(alpha = 0.8f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = TextPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                // Duration Pill
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(8.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color.Black.copy(alpha = 0.75f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = project.duration,
+                                        color = TextPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = project.date,
-                                    color = TextMuted,
-                                    fontSize = 11.sp
+                                    text = project.title,
+                                    color = TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = project.resolution,
+                                        color = NeonIndigo,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = project.date,
+                                        color = TextMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -1650,6 +1800,94 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+
+        // Privacy Policy & MLKit Data Processing Card
+        var showPrivacyDialog by remember { mutableStateOf(false) }
+
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            shape = RoundedCornerShape(16.dp),
+            backgroundColor = CharcoalSurface,
+            onClick = { showPrivacyDialog = true }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = "Privacy Policy",
+                        tint = ElectricBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Privacy & MLKit Data Policy",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "100% On-Device AI • No Cloud Data Transfer",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                Text(
+                    text = "View",
+                    color = ElectricBlue,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        if (showPrivacyDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showPrivacyDialog = false },
+                title = {
+                    Text(
+                        text = "Privacy Policy & MLKit Data",
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "VisionCutAI uses Google MLKit Selfie Segmentation to provide real-time background removal and green screen effects.",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "• All MLKit AI processing happens 100% locally on your device.\n• No video frames, images, or personal metadata are ever sent to external servers.\n• Project files (.vcp) are stored strictly in your local Documents folder.\n• You retain full ownership and control over all media created in VisionCutAI.",
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = { showPrivacyDialog = false },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = ElectricBlue)
+                    ) {
+                        Text("Got it", color = TextPrimary)
+                    }
+                },
+                containerColor = CharcoalSurface
+            )
         }
     }
 

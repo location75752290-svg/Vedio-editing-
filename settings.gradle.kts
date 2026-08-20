@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "VisionCut AI"
+rootProject.name = "VisionCutAI - Video Editor"
 
 include(":app")

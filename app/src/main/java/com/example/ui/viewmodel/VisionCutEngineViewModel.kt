@@ -67,6 +67,35 @@ class VisionCutEngineViewModel(application: Application) : AndroidViewModel(appl
 
     val isGeminiApiKeyAvailable: Boolean get() = geminiAiLayer.isApiKeyConfigured
 
+    private val _savedVcpProjects = MutableStateFlow<List<com.example.domain.model.VisionCutProjectData>>(emptyList())
+    val savedVcpProjects: StateFlow<List<com.example.domain.model.VisionCutProjectData>> = _savedVcpProjects.asStateFlow()
+
+    init {
+        refreshSavedVcpProjects()
+    }
+
+    fun refreshSavedVcpProjects() {
+        viewModelScope.launch {
+            val projects = com.example.engine.ProjectFileManager.createDemoProjectsIfEmpty(getApplication())
+            _savedVcpProjects.value = projects
+        }
+    }
+
+    fun saveVcpProject(projectData: com.example.domain.model.VisionCutProjectData, onComplete: ((java.io.File) -> Unit)? = null) {
+        viewModelScope.launch {
+            val file = com.example.engine.ProjectFileManager.saveProject(getApplication(), projectData)
+            refreshSavedVcpProjects()
+            onComplete?.invoke(file)
+        }
+    }
+
+    fun deleteVcpProject(projectData: com.example.domain.model.VisionCutProjectData) {
+        viewModelScope.launch {
+            com.example.engine.ProjectFileManager.deleteProject(getApplication(), projectData)
+            refreshSavedVcpProjects()
+        }
+    }
+
     fun togglePlayPause() {
         _isPlaying.value = !_isPlaying.value
     }

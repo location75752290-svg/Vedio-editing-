@@ -1,6 +1,6 @@
 {
-  "name": "VisionCut AI",
-  "description": "Premium AI Video Editor UI/UX Design with dark theme and glassmorphism",
+  "name": "VisionCutAI - Video Editor",
+  "description": "Premium AI Video Editor with AI Background Remover, Green Screen, Auto Captions, Keyframes, and Project Save/Load",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
