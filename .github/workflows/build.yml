@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./
+        working-directory: ./app
 
     steps:
     - name: Checkout Repository
@@ -30,33 +30,14 @@ jobs:
         cache: true
 
     - name: Verify Flutter Installation
-      working-directory: ./
       run: flutter --version
 
-    - name: Find pubspec.yaml and Install Dependencies
-      working-directory: ./
-      run: |
-        echo "Current Directory: $(pwd)"
-        ls -la
-        if [ -f "pubspec.yaml" ]; then
-          flutter pub get
-        else
-          echo "Looking for pubspec.yaml in subdirectories..."
-          PUBSPEC_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -printf '%h\n' | head -n 1)
-          if [ -n "$PUBSPEC_DIR" ]; then
-            echo "Found pubspec.yaml in $PUBSPEC_DIR"
-            cd "$PUBSPEC_DIR"
-            flutter pub get
-          else
-            echo "pubspec.yaml not found, attempting root pub get..."
-            flutter pub get || true
-          fi
-        fi
+    - name: Install Flutter Dependencies
+      run: flutter pub get
 
     - name: Restore Keystore from GitHub Secret
       env:
         KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
-      working-directory: ./
       run: |
         mkdir -p android/app
         if [ -n "$KEYSTORE_BASE64" ]; then
@@ -71,7 +52,6 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      working-directory: ./
       run: |
         cat <<EOF > android/key.properties
         storePassword=$KEYSTORE_PASSWORD
@@ -79,14 +59,13 @@ jobs:
         keyAlias=$KEY_ALIAS
         storeFile=upload-keystore.jks
         EOF
-        echo "key.properties successfully created."
+        echo "android/key.properties successfully created."
 
     - name: Build Flutter Release APK
-      working-directory: ./
       run: flutter build apk --release
 
     - name: Upload Release APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Flutter-Release-APK
-        path: build/app/outputs/flutter-apk/app-release.apk
+        path: app/build/app/outputs/flutter-apk/app-release.apk
