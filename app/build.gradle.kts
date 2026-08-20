@@ -25,27 +25,21 @@ android {
 
   signingConfigs {
     create("release") {
-      val customReleaseKey = file("${rootDir}/visioncutai_release.jks")
-      if (customReleaseKey.exists()) {
-        storeFile = customReleaseKey
-        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
-        keyAlias = System.getenv("KEY_ALIAS") ?: "visioncutai_release"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+      val envKeystorePath = System.getenv("KEYSTORE_PATH")
+      val keyFile = if (!envKeystorePath.isNullOrEmpty()) {
+        file(envKeystorePath)
+      } else if (file("${rootDir}/visioncutai_release.jks").exists()) {
+        file("${rootDir}/visioncutai_release.jks")
+      } else if (file("${rootDir}/my-upload-key.jks").exists()) {
+        file("${rootDir}/my-upload-key.jks")
       } else {
-        val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-        val keyFile = file(keystorePath)
-        if (keyFile.exists()) {
-          storeFile = keyFile
-          storePassword = System.getenv("STORE_PASSWORD") ?: "android"
-          keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
-          keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-        } else {
-          storeFile = file("${rootDir}/debug.keystore")
-          storePassword = "android"
-          keyAlias = "androiddebugkey"
-          keyPassword = "android"
-        }
+        file("${rootDir}/debug.keystore")
       }
+
+      storeFile = keyFile
+      storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "android"
+      keyAlias = System.getenv("KEY_ALIAS") ?: "visioncutai_release"
+      keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")

@@ -29,9 +29,13 @@ jobs:
         KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
       run: |
         if [ -n "$KEYSTORE_BASE64" ]; then
-          echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > visioncutai_release.jks
+          echo "Decoding release keystore from secrets..."
+          echo "$KEYSTORE_BASE64" | grep -v 'CERTIFICATE' | grep -v -- '-----' | tr -d '\r\n ' | base64 -d > visioncutai_release.jks
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/visioncutai_release.jks" >> $GITHUB_ENV
         elif [ -f "debug.keystore.base64" ]; then
+          echo "Decoding debug fallback keystore..."
           base64 -d debug.keystore.base64 > debug.keystore || true
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/debug.keystore" >> $GITHUB_ENV
         fi
 
     - name: Build Release AAB
@@ -40,7 +44,7 @@ jobs:
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      run: gradle :app:bundleRelease --no-daemon
+      run: ./gradlew :app:bundleRelease --no-daemon || gradle :app:bundleRelease --no-daemon
 
     - name: Upload Release AAB Artifact
       uses: actions/upload-artifact@v4
