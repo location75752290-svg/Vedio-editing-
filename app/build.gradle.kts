@@ -37,9 +37,9 @@ android {
       }
 
       storeFile = keyFile
-      storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "android"
+      storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "VisionCut2026MasterKeyPass"
       keyAlias = System.getenv("KEY_ALIAS") ?: "visioncutai_release"
-      keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+      keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: "VisionCut2026MasterKeyPass"
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
