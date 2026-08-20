@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
 
     steps:
     - name: Checkout Repository
@@ -27,24 +30,48 @@ jobs:
         cache: true
 
     - name: Verify Flutter Installation
+      working-directory: ./
       run: flutter --version
 
-    - name: Install Flutter Dependencies
-      run: flutter pub get || true
+    - name: Find pubspec.yaml and Install Dependencies
+      working-directory: ./
+      run: |
+        echo "Current Directory: $(pwd)"
+        ls -la
+        if [ -f "pubspec.yaml" ]; then
+          flutter pub get
+        else
+          echo "Looking for pubspec.yaml in subdirectories..."
+          PUBSPEC_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -printf '%h\n' | head -n 1)
+          if [ -n "$PUBSPEC_DIR" ]; then
+            echo "Found pubspec.yaml in $PUBSPEC_DIR"
+            cd "$PUBSPEC_DIR"
+            flutter pub get
+          else
+            echo "pubspec.yaml not found, attempting root pub get..."
+            flutter pub get || true
+          fi
+        fi
 
     - name: Restore Keystore from GitHub Secret
       env:
         KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
+      working-directory: ./
       run: |
         mkdir -p android/app
-        echo "$KEYSTORE_BASE64" | grep -v 'CERTIFICATE' | grep -v -- '-----' | tr -d '\r\n ' | base64 -d > android/app/upload-keystore.jks
-        echo "Keystore successfully restored at android/app/upload-keystore.jks"
+        if [ -n "$KEYSTORE_BASE64" ]; then
+          echo "$KEYSTORE_BASE64" | grep -v 'CERTIFICATE' | grep -v -- '-----' | tr -d '\r\n ' | base64 -d > android/app/upload-keystore.jks
+          echo "Keystore successfully restored at android/app/upload-keystore.jks"
+        else
+          echo "KEYSTORE_FILE secret is empty!"
+        fi
 
     - name: Create key.properties file
       env:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      working-directory: ./
       run: |
         cat <<EOF > android/key.properties
         storePassword=$KEYSTORE_PASSWORD
@@ -55,6 +82,7 @@ jobs:
         echo "key.properties successfully created."
 
     - name: Build Flutter Release APK
+      working-directory: ./
       run: flutter build apk --release
 
     - name: Upload Release APK Artifact
