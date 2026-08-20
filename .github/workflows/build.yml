@@ -41,12 +41,22 @@ jobs:
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/debug.keystore" >> $GITHUB_ENV
         fi
 
+    - name: Prepare Environment Secrets
+      env:
+        GOOGLE_API_KEY_SECRET: ${{ secrets.GOOGLE_API_KEY }}
+      run: |
+        if [ -n "$GOOGLE_API_KEY_SECRET" ]; then
+          echo "Writing GOOGLE_API_KEY to .env file..."
+          echo "GOOGLE_API_KEY=$GOOGLE_API_KEY_SECRET" > .env
+        fi
+
     - name: Build Release APK
       env:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: ./gradlew :app:assembleRelease --no-daemon || gradle :app:assembleRelease --no-daemon
 
     - name: Build Release AAB (App Bundle)
@@ -54,7 +64,8 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: ./gradlew :app:bundleRelease --no-daemon || gradle :app:bundleRelease --no-daemon
 
     - name: Upload Release APK Artifact
