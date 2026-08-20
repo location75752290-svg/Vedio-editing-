@@ -1,0 +1,64 @@
+name: Flutter Build Release APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Java JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Flutter 3.22.0
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.22.0'
+        channel: 'stable'
+        cache: true
+
+    - name: Verify Flutter Installation
+      run: flutter --version
+
+    - name: Install Flutter Dependencies
+      run: flutter pub get || true
+
+    - name: Restore Keystore from GitHub Secret
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
+      run: |
+        mkdir -p android/app
+        echo "$KEYSTORE_BASE64" | grep -v 'CERTIFICATE' | grep -v -- '-----' | tr -d '\r\n ' | base64 -d > android/app/upload-keystore.jks
+        echo "Keystore successfully restored at android/app/upload-keystore.jks"
+
+    - name: Create key.properties file
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        cat <<EOF > android/key.properties
+        storePassword=$KEYSTORE_PASSWORD
+        keyPassword=$KEY_PASSWORD
+        keyAlias=$KEY_ALIAS
+        storeFile=upload-keystore.jks
+        EOF
+        echo "key.properties successfully created."
+
+    - name: Build Flutter Release APK
+      run: flutter build apk --release
+
+    - name: Upload Release APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Flutter-Release-APK
+        path: build/app/outputs/flutter-apk/app-release.apk
