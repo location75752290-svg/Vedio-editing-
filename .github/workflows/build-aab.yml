@@ -25,12 +25,21 @@ jobs:
         gradle-version: 9.3.1
 
     - name: Restore Keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
       run: |
-        if [ -f "debug.keystore.base64" ]; then
+        if [ -n "$KEYSTORE_BASE64" ]; then
+          echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > visioncutai_release.jks
+        elif [ -f "debug.keystore.base64" ]; then
           base64 -d debug.keystore.base64 > debug.keystore || true
         fi
 
     - name: Build Release AAB
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       run: gradle :app:bundleRelease --no-daemon
 
     - name: Upload Release AAB Artifact

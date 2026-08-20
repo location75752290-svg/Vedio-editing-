@@ -28,9 +28,9 @@ android {
       val customReleaseKey = file("${rootDir}/visioncutai_release.jks")
       if (customReleaseKey.exists()) {
         storeFile = customReleaseKey
-        storePassword = "android"
-        keyAlias = "visioncutai"
-        keyPassword = "android"
+        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+        keyAlias = System.getenv("KEY_ALIAS") ?: "visioncutai_release"
+        keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
       } else {
         val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
         val keyFile = file(keystorePath)
