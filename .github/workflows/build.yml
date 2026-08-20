@@ -1,4 +1,4 @@
-name: Flutter Build Release APK
+name: Build Native Android Release (APK & AAB)
 
 on:
   push:
@@ -8,64 +8,63 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./app
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Setup Java JDK 17
+    - name: Setup JDK 17
       uses: actions/setup-java@v4
       with:
-        distribution: 'temurin'
         java-version: '17'
+        distribution: 'temurin'
 
-    - name: Setup Flutter 3.22.0
-      uses: subosito/flutter-action@v2
+    - name: Setup Gradle 9.3.1
+      uses: gradle/actions/setup-gradle@v3
       with:
-        flutter-version: '3.22.0'
-        channel: 'stable'
-        cache: true
+        gradle-version: 9.3.1
 
-    - name: Verify Flutter Installation
-      run: flutter --version
+    - name: Make Gradlew Executable
+      run: chmod +x ./gradlew || true
 
-    - name: Install Flutter Dependencies
-      run: flutter pub get
-
-    - name: Restore Keystore from GitHub Secret
+    - name: Restore Keystore from GitHub Secrets
       env:
         KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
       run: |
-        mkdir -p android/app
         if [ -n "$KEYSTORE_BASE64" ]; then
-          echo "$KEYSTORE_BASE64" | grep -v 'CERTIFICATE' | grep -v -- '-----' | tr -d '\r\n ' | base64 -d > android/app/upload-keystore.jks
-          echo "Keystore successfully restored at android/app/upload-keystore.jks"
-        else
-          echo "KEYSTORE_FILE secret is empty!"
+          echo "Decoding release keystore from GitHub Secrets..."
+          echo "$KEYSTORE_BASE64" | grep -v 'CERTIFICATE' | grep -v -- '-----' | tr -d '\r\n ' | base64 -d > visioncutai_release.jks
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/visioncutai_release.jks" >> $GITHUB_ENV
+        elif [ -f "debug.keystore.base64" ]; then
+          echo "Decoding fallback debug keystore..."
+          base64 -d debug.keystore.base64 > debug.keystore || true
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/debug.keystore" >> $GITHUB_ENV
         fi
 
-    - name: Create key.properties file
+    - name: Build Release APK
       env:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      run: |
-        cat <<EOF > android/key.properties
-        storePassword=$KEYSTORE_PASSWORD
-        keyPassword=$KEY_PASSWORD
-        keyAlias=$KEY_ALIAS
-        storeFile=upload-keystore.jks
-        EOF
-        echo "android/key.properties successfully created."
+        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+      run: ./gradlew :app:assembleRelease --no-daemon || gradle :app:assembleRelease --no-daemon
 
-    - name: Build Flutter Release APK
-      run: flutter build apk --release
+    - name: Build Release AAB (App Bundle)
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+      run: ./gradlew :app:bundleRelease --no-daemon || gradle :app:bundleRelease --no-daemon
 
     - name: Upload Release APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Flutter-Release-APK
-        path: app/build/app/outputs/flutter-apk/app-release.apk
+        name: Release-APK
+        path: app/build/outputs/apk/release/
+
+    - name: Upload Release AAB Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Release-AAB
+        path: app/build/outputs/bundle/release/
