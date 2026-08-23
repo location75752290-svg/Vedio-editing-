@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,10 +47,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GradientButton
 import com.example.ui.theme.CharcoalSurface
@@ -81,6 +84,7 @@ fun AiToolsScreen(
     onOpenRemoveBg: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var selectedToolForModal by remember { mutableStateOf<AiToolData?>(null) }
 
     val aiToolsList = listOf(
@@ -401,6 +405,22 @@ fun AiToolsScreen(
                         selectedToolForModal = null
                         if (toolId == "bg_remover") {
                             onOpenRemoveBg()
+                        } else {
+                            val isGoogleKeyEmpty = try {
+                                BuildConfig.GOOGLE_API_KEY.isEmpty() || BuildConfig.GOOGLE_API_KEY == "MY_GOOGLE_API_KEY"
+                            } catch (e: Exception) {
+                                true
+                            }
+                            val isGeminiKeyEmpty = try {
+                                BuildConfig.GEMINI_API_KEY.isEmpty() || BuildConfig.GEMINI_API_KEY == "MY_GEMINI_API_KEY"
+                            } catch (e: Exception) {
+                                true
+                            }
+                            if (isGoogleKeyEmpty && isGeminiKeyEmpty) {
+                                Toast.makeText(context, "Please add API Key in Secrets", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Initializing ${tool.title}...", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     modifier = Modifier

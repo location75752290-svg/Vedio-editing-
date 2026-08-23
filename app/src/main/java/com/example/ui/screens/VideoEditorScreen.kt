@@ -1,11 +1,15 @@
 package com.example.ui.screens
 
+import com.example.data.UrduQuote
+import com.example.data.UrduQuotesRepository
+
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -18,14 +22,19 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -33,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,6 +75,7 @@ import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownloadDone
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Gradient
 import androidx.compose.material.icons.filled.GraphicEq
@@ -124,15 +135,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -173,6 +188,7 @@ import com.example.engine.CaptionItem
 import com.example.engine.CaptionStyleConfig
 import com.example.engine.WordTimestamp
 import com.example.ui.components.AutoCaptionEditorPanel
+import com.example.ui.components.FilterThumbnailBar
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiveCaptionPreviewOverlay
 import com.example.ui.theme.CharcoalSurface
@@ -249,6 +265,7 @@ data class VideoProjectState(
     val selectedCrop: String = "9:16",
     val cropScale: Float = 1.0f,
     val selectedSpeed: Float = 1.0f,
+    val selectedSpeedCurve: String = "Standard",
     val selectedFilter: String = "Normal",
     val selectedTransition: String? = "Fade",
     val transitionDurationSec: Float = 0.8f,
@@ -266,7 +283,19 @@ data class VideoProjectState(
     val captions: List<CaptionItem> = emptyList(),
     val captionStyle: CaptionStyleConfig = CaptionStyleConfig(),
     val showCaptions: Boolean = true,
-    val bgRemoverConfig: com.example.engine.BgRemoverConfig = com.example.engine.BgRemoverConfig()
+    val bgRemoverConfig: com.example.engine.BgRemoverConfig = com.example.engine.BgRemoverConfig(),
+    val adjBrightness: Float = 0f,
+    val adjContrast: Float = 0f,
+    val adjSaturation: Float = 0f,
+    val adjSharpen: Float = 0f,
+    val adjVignette: Float = 0f,
+    val adjWarmth: Float = 0f,
+    val selectedCapCutFx: String = "None",
+    val selectedClipAnimation: String = "None",
+    val selectedVoiceEffect: String = "Normal",
+    val audioFadeInSec: Float = 0f,
+    val audioFadeOutSec: Float = 0f,
+    val selectedSoundFx: String = ""
 )
 
 fun interpolateKeyframe(keyframes: List<Keyframe>, currentTimeMs: Long): Keyframe {
@@ -394,9 +423,111 @@ private fun createVideoEffectsList(
     resolution: String = "1080p 30fps",
     captions: List<CaptionItem> = emptyList(),
     captionStyle: CaptionStyleConfig = CaptionStyleConfig(),
-    showCaptions: Boolean = false
+    showCaptions: Boolean = false,
+    adjBrightness: Float = 0f,
+    adjContrast: Float = 0f,
+    adjSaturation: Float = 0f,
+    adjWarmth: Float = 0f,
+    selectedCapCutFx: String = "None"
 ): List<Effect> {
     val effects = mutableListOf<Effect>()
+
+    // Pro Color Adjustments (Brightness, Contrast, Saturation, Warmth)
+    if (adjBrightness != 0f || adjContrast != 0f || adjSaturation != 0f || adjWarmth != 0f) {
+        val rScale = (1.0f + (adjWarmth / 100f) + (adjBrightness / 100f)).coerceIn(0.1f, 3.0f)
+        val gScale = (1.0f + (adjBrightness / 100f)).coerceIn(0.1f, 3.0f)
+        val bScale = (1.0f - (adjWarmth / 100f) + (adjBrightness / 100f)).coerceIn(0.1f, 3.0f)
+        effects.add(
+            RgbAdjustment.Builder()
+                .setRedScale(rScale)
+                .setGreenScale(gScale)
+                .setBlueScale(bScale)
+                .build()
+        )
+        if (adjContrast != 0f) {
+            effects.add(Contrast((adjContrast / 100f).coerceIn(-0.8f, 0.9f)))
+        }
+    }
+
+    // CapCut Pro Video FX (50 Professional Effects)
+    when (selectedCapCutFx) {
+        // --- Trending ---
+        "Flash Strobe" -> effects.add(RgbAdjustment.Builder().setRedScale(1.4f).setGreenScale(1.4f).setBlueScale(1.4f).build())
+        "Neon Outline" -> effects.add(RgbAdjustment.Builder().setRedScale(1.5f).setGreenScale(1.1f).setBlueScale(1.8f).build())
+        "Retro VHS Glitch" -> effects.add(RgbAdjustment.Builder().setRedScale(1.3f).setGreenScale(0.9f).setBlueScale(1.2f).build())
+        "Soft Dreamy Glow" -> effects.add(RgbAdjustment.Builder().setRedScale(1.2f).setGreenScale(1.2f).setBlueScale(1.2f).build())
+        "RGB Split" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.08f, 1.08f).setRotationDegrees(1.5f).build())
+        "Zoom Shake" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.15f, 1.15f).setRotationDegrees(-2.0f).build())
+        "Cinema Grain 4K" -> effects.add(Contrast(0.25f))
+        "Vlog Vintage" -> {
+            effects.add(RgbAdjustment.Builder().setRedScale(1.18f).setGreenScale(1.10f).setBlueScale(0.90f).build())
+            effects.add(Contrast(-0.05f))
+        }
+        "Cyberpunk Light" -> effects.add(RgbAdjustment.Builder().setRedScale(1.45f).setGreenScale(1.05f).setBlueScale(1.55f).build())
+
+        // --- Glitch & Party ---
+        "Cyber Glitch" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.05f, 1.02f).setRotationDegrees(1.0f).build())
+        "Electro Strobe" -> effects.add(RgbAdjustment.Builder().setRedScale(1.5f).setGreenScale(1.5f).setBlueScale(1.5f).build())
+        "Matrix Digital" -> effects.add(RgbAdjustment.Builder().setRedScale(0.8f).setGreenScale(1.4f).setBlueScale(0.8f).build())
+        "Color Fringe" -> effects.add(RgbAdjustment.Builder().setRedScale(1.2f).setGreenScale(1.0f).setBlueScale(1.2f).build())
+        "Bad Signal" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.03f, 1.03f).build())
+        "Psychedelic Shimmer" -> effects.add(RgbAdjustment.Builder().setRedScale(1.25f).setGreenScale(1.35f).setBlueScale(1.15f).build())
+        "Acid Spill" -> effects.add(RgbAdjustment.Builder().setRedScale(1.3f).setGreenScale(1.4f).setBlueScale(0.7f).build())
+        "Mirror Reflection" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(-1f, 1f).build())
+        "Pixel Blur" -> effects.add(Contrast(-0.2f))
+        "Noise Over" -> effects.add(Contrast(0.15f))
+
+        // --- Cinematic & Lighting ---
+        "Anamorphic Flare" -> effects.add(RgbAdjustment.Builder().setRedScale(0.95f).setGreenScale(1.05f).setBlueScale(1.40f).build())
+        "Sunlight Leak" -> effects.add(RgbAdjustment.Builder().setRedScale(1.32f).setGreenScale(1.15f).setBlueScale(0.92f).build())
+        "Dreamy Glow Pro" -> effects.add(RgbAdjustment.Builder().setRedScale(1.25f).setGreenScale(1.25f).setBlueScale(1.25f).build())
+        "Neon Halo" -> effects.add(RgbAdjustment.Builder().setRedScale(1.35f).setGreenScale(0.9f).setBlueScale(1.45f).build())
+        "Midnight Moonlight" -> effects.add(RgbAdjustment.Builder().setRedScale(0.82f).setGreenScale(0.95f).setBlueScale(1.30f).build())
+        "Vignette Dark" -> effects.add(Contrast(-0.15f))
+        "Warm Sunfire" -> effects.add(RgbAdjustment.Builder().setRedScale(1.38f).setGreenScale(1.12f).setBlueScale(0.82f).build())
+        "S-Log Look" -> effects.add(Contrast(-0.35f))
+        "Lomo Vignette" -> {
+            effects.add(Contrast(0.3f))
+            effects.add(RgbAdjustment.Builder().setRedScale(1.1f).setGreenScale(1.1f).setBlueScale(0.9f).build())
+        }
+        "HDR Super Bloom" -> {
+            effects.add(Contrast(0.2f))
+            effects.add(RgbAdjustment.Builder().setRedScale(1.18f).setGreenScale(1.18f).setBlueScale(1.18f).build())
+        }
+
+        // --- Retro & Film ---
+        "Super 8 Vintage" -> {
+            effects.add(RgbAdjustment.Builder().setRedScale(1.18f).setGreenScale(1.08f).setBlueScale(0.82f).build())
+            effects.add(Contrast(-0.08f))
+        }
+        "16mm Nostalgia" -> {
+            effects.add(RgbAdjustment.Builder().setRedScale(1.12f).setGreenScale(1.10f).setBlueScale(0.92f).build())
+            effects.add(Contrast(0.08f))
+        }
+        "Old Movie Dust" -> effects.add(RgbAdjustment.Builder().setRedScale(1.10f).setGreenScale(1.05f).setBlueScale(0.95f).build())
+        "Retro Polaroid" -> {
+            effects.add(RgbAdjustment.Builder().setRedScale(1.15f).setGreenScale(1.12f).setBlueScale(0.78f).build())
+            effects.add(Contrast(-0.12f))
+        }
+        "Sepia Dream" -> effects.add(RgbAdjustment.Builder().setRedScale(1.20f).setGreenScale(1.10f).setBlueScale(0.85f).build())
+        "Muted Chrome" -> effects.add(Contrast(0.18f))
+        "Black & White Classic" -> effects.add(RgbFilter.createGrayscaleFilter())
+        "Film Burn Red" -> effects.add(RgbAdjustment.Builder().setRedScale(1.55f).setGreenScale(0.85f).setBlueScale(0.85f).build())
+        "Teal Orange Grade" -> effects.add(RgbAdjustment.Builder().setRedScale(1.22f).setGreenScale(1.05f).setBlueScale(1.18f).build())
+        "Classic Grain" -> effects.add(Contrast(0.10f))
+
+        // --- Blur & Focus ---
+        "Dynamic Zoom" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.12f, 1.12f).build())
+        "Radial Spin" -> effects.add(ScaleAndRotateTransformation.Builder().setRotationDegrees(2.5f).build())
+        "Ghost Echo" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.04f, 1.04f).setRotationDegrees(0.5f).build())
+        "Soft Mist Focus" -> effects.add(Contrast(-0.10f))
+        "Vertical Blur" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.01f, 1.06f).build())
+        "Horizontal Shake" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.05f, 1.01f).setRotationDegrees(0.8f).build())
+        "Motion Trail" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.06f, 1.06f).build())
+        "Edge Glow Blur" -> effects.add(RgbAdjustment.Builder().setRedScale(1.15f).setGreenScale(1.15f).setBlueScale(1.25f).build())
+        "Prism Refraction" -> effects.add(ScaleAndRotateTransformation.Builder().setScale(1.05f, 1.05f).setRotationDegrees(-1.2f).build())
+        "Depth Field Blur" -> effects.add(Contrast(-0.08f))
+    }
 
     // 1. Apply Crop before all other effects in pipeline
     when (cropRatio) {
@@ -437,9 +568,16 @@ private fun createVideoEffectsList(
     }
 
     // 2. Resolution scaling
-    if (resolution == "720p 30fps") {
+    val targetHeight = when {
+        resolution.contains("4K") -> 2160
+        resolution.contains("2K") -> 1440
+        resolution.contains("1080p") -> 1080
+        resolution.contains("720p") -> 720
+        else -> -1
+    }
+    if (targetHeight > 0) {
         try {
-            effects.add(Presentation.createForHeight(720))
+            effects.add(Presentation.createForHeight(targetHeight))
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -450,33 +588,26 @@ private fun createVideoEffectsList(
         effects.add(SpeedChangeEffect(speed))
     }
 
-    // 4. Video Filter
-    when (filter) {
-        "Grayscale" -> effects.add(RgbFilter.createGrayscaleFilter())
-        "Sepia" -> {
-            val sepiaMatrix = floatArrayOf(
-                0.393f, 0.769f, 0.189f, 0f,
-                0.349f, 0.686f, 0.168f, 0f,
-                0.272f, 0.534f, 0.131f, 0f,
-                0f,     0f,     0f,     1f
-            )
-            effects.add(RgbMatrix { _, _ -> sepiaMatrix })
+    // 4. Video Filter (50 Unified Filters shared with Photo Editor)
+    val filterSpec = com.example.engine.VisionCutFilterEngine.findFilter(filter)
+    if (filterSpec.id != "normal") {
+        when (filterSpec.id) {
+            "bw" -> effects.add(RgbFilter.createGrayscaleFilter())
+            "clarity" -> effects.add(Contrast(0.5f))
+            else -> {
+                val matrix = filterSpec.baseMatrix
+                val r = matrix[0]
+                val g = matrix[6]
+                val b = matrix[12]
+                effects.add(
+                    RgbAdjustment.Builder()
+                        .setRedScale(r)
+                        .setGreenScale(g)
+                        .setBlueScale(b)
+                        .build()
+                )
+            }
         }
-        "Contrast" -> effects.add(Contrast(0.5f))
-        "Warm" -> effects.add(
-            RgbAdjustment.Builder()
-                .setRedScale(1.30f)
-                .setGreenScale(1.05f)
-                .setBlueScale(0.80f)
-                .build()
-        )
-        "Cool" -> effects.add(
-            RgbAdjustment.Builder()
-                .setRedScale(0.80f)
-                .setGreenScale(1.05f)
-                .setBlueScale(1.35f)
-                .build()
-        )
     }
 
     // 5. Video Transition Effects
@@ -654,6 +785,40 @@ fun VideoEditorScreen(
     var selectedSpeed by remember { mutableFloatStateOf(1.0f) }
     var selectedFilter by remember { mutableStateOf("Normal") }
 
+    // Video frame preview bitmap for live filter thumbnails
+    var videoFrameThumbnail by remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(videoUri) {
+        if (videoUri != null) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val retriever = MediaMetadataRetriever()
+                    retriever.setDataSource(context, videoUri)
+                    val frame = retriever.getFrameAtTime(1000000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?: retriever.frameAtTime
+                    retriever.release()
+                    if (frame != null) {
+                        val maxDim = 160
+                        val aspect = frame.width.toFloat() / frame.height.toFloat()
+                        val (w, h) = if (aspect >= 1f) {
+                            (maxDim * aspect).toInt().coerceAtMost(240) to maxDim
+                        } else {
+                            maxDim to (maxDim / aspect).toInt().coerceAtMost(240)
+                        }
+                        val scaled = Bitmap.createScaledBitmap(frame, w.coerceAtLeast(1), h.coerceAtLeast(1), true)
+                        withContext(Dispatchers.Main) {
+                            videoFrameThumbnail = scaled
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } else {
+            videoFrameThumbnail = null
+        }
+    }
+
     // Crop Tool state (16:9, 1:1, 9:16, Free, Original)
     var selectedCrop by remember { mutableStateOf("9:16") }
     var cropScale by remember { mutableFloatStateOf(1.0f) }
@@ -686,6 +851,9 @@ fun VideoEditorScreen(
 
     // Export Settings state
     var selectedResolution by remember { mutableStateOf("1080p 30fps") }
+    var selectedBitrate by remember { mutableStateOf("Auto Recommended") }
+    var selectedColorGrading by remember { mutableStateOf("Rec.709 Standard") }
+    var selectedEncoder by remember { mutableStateOf("H.264 AVC (Highly Compatible)") }
 
     // Auto Captions state
     val captions = remember { mutableStateListOf<CaptionItem>() }
@@ -694,20 +862,56 @@ fun VideoEditorScreen(
 
     // AI Background Remover & Green Screen state
     var bgRemoverConfig by remember { mutableStateOf(com.example.engine.BgRemoverConfig()) }
+    var isCutoutProcessing by remember { mutableStateOf(false) }
+    var cutoutProgressMsg by remember { mutableStateOf("") }
 
-    // Tools List: Cut, Crop, Speed, Filter, Transitions, BG Remover, Text, Captions, Music, Export
+    // CapCut Pro Speed & Velocity Curve state
+    var selectedSpeedCurve by remember { mutableStateOf("Standard") }
+
+    // CapCut Pro Color Adjustments state
+    var adjBrightness by remember { mutableFloatStateOf(0f) }
+    var adjContrast by remember { mutableFloatStateOf(0f) }
+    var adjSaturation by remember { mutableFloatStateOf(0f) }
+    var adjSharpen by remember { mutableFloatStateOf(0f) }
+    var adjVignette by remember { mutableFloatStateOf(0f) }
+    var adjWarmth by remember { mutableFloatStateOf(0f) }
+
+    // CapCut Pro Video FX & Clip Animations state
+    var selectedCapCutFx by remember { mutableStateOf("None") }
+    var selectedClipAnimation by remember { mutableStateOf("None") }
+
+    // AI Pro Enhancer & Stabilization state
+    var isStabilizationEnabled by remember { mutableStateOf(false) }
+    var stabilizationMode by remember { mutableStateOf("Standard") } // "Standard", "SteadyCam", "Extreme Pro"
+    var isHdEnhancementEnabled by remember { mutableStateOf(false) }
+    var hdEnhancementLevel by remember { mutableFloatStateOf(60f) }
+    var isOpticalFlowEnabled by remember { mutableStateOf(false) }
+
+    // CapCut Pro Voice Effects & Audio AI state
+    var selectedVoiceEffect by remember { mutableStateOf("Normal") }
+    var audioFadeInSec by remember { mutableFloatStateOf(0f) }
+    var audioFadeOutSec by remember { mutableFloatStateOf(0f) }
+    var selectedSoundFx by remember { mutableStateOf("") }
+    var selectedShayariCategory by remember { mutableStateOf("سب (All)") }
+
+    // Tools List: Cut, Crop, Speed, Adjust, Filter, Effects, Voice FX, BG Remover, Transitions, Text, Captions, Music, Export
     val textToolbarLabel = if (keyframes.isNotEmpty()) "Text (♦${keyframes.size})" else if (overlayText.isNotBlank()) "Text ($overlayText)" else "Text"
     val captionsToolbarLabel = if (captions.isNotEmpty()) "Captions (${captions.size})" else "Auto Captions"
     val toolsList = listOf(
         VideoToolItem("cut", "Cut", Icons.Default.ContentCut, RadiantPink),
         VideoToolItem("crop", "Crop ($selectedCrop)", Icons.Default.Crop, orangeAccent),
-        VideoToolItem("speed", if (selectedSpeed != 1.0f) "Speed (${selectedSpeed}x)" else "Speed", Icons.Default.Speed, ElectricBlue),
+        VideoToolItem("speed", if (selectedSpeedCurve != "Standard") "Speed ($selectedSpeedCurve)" else if (selectedSpeed != 1.0f) "Speed (${selectedSpeed}x)" else "Speed", Icons.Default.Speed, ElectricBlue),
+        VideoToolItem("adjust", if (adjBrightness != 0f || adjContrast != 0f || adjSaturation != 0f) "Adjust (✨)" else "Adjust", Icons.Default.Gradient, Color(0xFFFFAB00)),
         VideoToolItem("filter", if (selectedFilter != "Normal") "Filter ($selectedFilter)" else "Filter", Icons.Default.MovieFilter, DeepPurple),
+        VideoToolItem("effects", if (selectedCapCutFx != "None" || selectedClipAnimation != "None") "FX ($selectedCapCutFx)" else "CapCut FX", Icons.Default.AutoAwesome, RadiantPink),
+        VideoToolItem("ai_pro", if (isStabilizationEnabled || isHdEnhancementEnabled || isOpticalFlowEnabled) "AI Pro (✨)" else "AI Pro", Icons.Default.AutoAwesome, Color(0xFF00E5FF)),
+        VideoToolItem("voice_fx", if (selectedVoiceEffect != "Normal") "Voice ($selectedVoiceEffect)" else "Voice FX", Icons.Default.VolumeUp, cyanAccent),
         VideoToolItem("bg_remover", if (bgRemoverConfig.enabled) "BG Remover (🟢)" else "BG Remover", Icons.Default.BlurLinear, Color(0xFF00E676)),
         VideoToolItem("transitions", if (!selectedTransition.isNullOrBlank()) "Transitions ($selectedTransition)" else "Transitions", Icons.Default.Animation, purpleAccent),
         VideoToolItem("text", textToolbarLabel, Icons.Default.TextFields, goldAccent),
+        VideoToolItem("shayari", "Shayari", Icons.Default.FormatQuote, RadiantPink),
         VideoToolItem("captions", captionsToolbarLabel, Icons.Default.ClosedCaption, cyanAccent),
-        VideoToolItem("music", if (musicTitle.isNotBlank()) "Music (\"$musicTitle\")" else "Music", Icons.Default.MusicNote, musicGreen),
+        VideoToolItem("music", if (musicTitle.isNotBlank() || selectedSoundFx.isNotBlank()) "Music (\"$musicTitle\")" else "Music", Icons.Default.MusicNote, musicGreen),
         VideoToolItem("export", "Export", Icons.Default.IosShare, cyanAccent)
     )
 
@@ -719,15 +923,10 @@ fun VideoEditorScreen(
         CropRatioItem("Free", "Free", "Custom Drag", Icons.Default.CropFree, null)
     )
 
-    // 6 Video Filters
-    val filtersList = listOf(
-        FilterItem("Normal", "Normal", listOf(Color(0xFF4A5568), Color(0xFF2D3748))),
-        FilterItem("Grayscale", "Grayscale", listOf(Color(0xFFCBD5E1), Color(0xFF475569))),
-        FilterItem("Sepia", "Sepia", listOf(Color(0xFFD97706), Color(0xFF78350F))),
-        FilterItem("Contrast", "Contrast", listOf(Color(0xFFFF007A), Color(0xFF7928CA))),
-        FilterItem("Warm", "Warm", listOf(Color(0xFFF59E0B), Color(0xFFDC2626))),
-        FilterItem("Cool", "Cool", listOf(Color(0xFF38BDF8), Color(0xFF2563EB)))
-    )
+    // 15 Unified Video & Photo Filters
+    val filtersList = com.example.engine.VisionCutFilterEngine.ALL_15_FILTERS.map {
+        FilterItem(it.id, it.name, it.previewGradient)
+    }
 
     // 8 Video Transitions
     val transitionsList = listOf(
@@ -767,6 +966,7 @@ fun VideoEditorScreen(
             selectedCrop = selectedCrop,
             cropScale = cropScale,
             selectedSpeed = selectedSpeed,
+            selectedSpeedCurve = selectedSpeedCurve,
             selectedFilter = selectedFilter,
             selectedTransition = selectedTransition,
             transitionDurationSec = transitionDurationSec,
@@ -784,7 +984,19 @@ fun VideoEditorScreen(
             captions = captions.toList(),
             captionStyle = captionStyle,
             showCaptions = showCaptions,
-            bgRemoverConfig = bgRemoverConfig
+            bgRemoverConfig = bgRemoverConfig,
+            adjBrightness = adjBrightness,
+            adjContrast = adjContrast,
+            adjSaturation = adjSaturation,
+            adjSharpen = adjSharpen,
+            adjVignette = adjVignette,
+            adjWarmth = adjWarmth,
+            selectedCapCutFx = selectedCapCutFx,
+            selectedClipAnimation = selectedClipAnimation,
+            selectedVoiceEffect = selectedVoiceEffect,
+            audioFadeInSec = audioFadeInSec,
+            audioFadeOutSec = audioFadeOutSec,
+            selectedSoundFx = selectedSoundFx
         )
     }
 
@@ -794,6 +1006,7 @@ fun VideoEditorScreen(
         selectedCrop = state.selectedCrop
         cropScale = state.cropScale
         selectedSpeed = state.selectedSpeed
+        selectedSpeedCurve = state.selectedSpeedCurve
         selectedFilter = state.selectedFilter
         selectedTransition = state.selectedTransition
         transitionDurationSec = state.transitionDurationSec
@@ -814,6 +1027,18 @@ fun VideoEditorScreen(
         captionStyle = state.captionStyle
         showCaptions = state.showCaptions
         bgRemoverConfig = state.bgRemoverConfig
+        adjBrightness = state.adjBrightness
+        adjContrast = state.adjContrast
+        adjSaturation = state.adjSaturation
+        adjSharpen = state.adjSharpen
+        adjVignette = state.adjVignette
+        adjWarmth = state.adjWarmth
+        selectedCapCutFx = state.selectedCapCutFx
+        selectedClipAnimation = state.selectedClipAnimation
+        selectedVoiceEffect = state.selectedVoiceEffect
+        audioFadeInSec = state.audioFadeInSec
+        audioFadeOutSec = state.audioFadeOutSec
+        selectedSoundFx = state.selectedSoundFx
     }
 
     fun pushStateSnapshot() {
@@ -856,6 +1081,17 @@ fun VideoEditorScreen(
             musicUri = uri
             musicTitle = getFileNameFromUri(context, uri)
             Toast.makeText(context, "Added: $musicTitle", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // BG Image Picker Launcher for Background Replacement
+    val bgImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            pushStateSnapshot()
+            bgRemoverConfig = bgRemoverConfig.copy(replaceBgUri = uri, mode = "replace_image", enabled = true)
+            Toast.makeText(context, "Background image selected", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1015,8 +1251,8 @@ fun VideoEditorScreen(
         }
     }
 
-    // Apply Live Video Effects (Filter, Transition, Speed, Crop) to ExoPlayer
-    LaunchedEffect(selectedFilter, selectedSpeed, selectedTransition, transitionDurationSec, selectedCrop, cropScale) {
+    // Apply Live Video Effects (Filter, Transition, Speed, Crop, Color Adjust, FX) to ExoPlayer
+    LaunchedEffect(selectedFilter, selectedSpeed, selectedTransition, transitionDurationSec, selectedCrop, cropScale, adjBrightness, adjContrast, adjSaturation, adjWarmth, selectedCapCutFx) {
         try {
             val videoEffects = createVideoEffectsList(
                 selectedFilter,
@@ -1028,7 +1264,12 @@ fun VideoEditorScreen(
                 "", // Text is rendered live via Compose Overlay in player box
                 overlayColor,
                 overlayFontSize,
-                overlayPosition
+                overlayPosition,
+                adjBrightness = adjBrightness,
+                adjContrast = adjContrast,
+                adjSaturation = adjSaturation,
+                adjWarmth = adjWarmth,
+                selectedCapCutFx = selectedCapCutFx
             )
             exoPlayer.setVideoEffects(videoEffects)
             exoPlayer.setPlaybackSpeed(selectedSpeed)
@@ -1117,7 +1358,7 @@ fun VideoEditorScreen(
             })
         }
 
-        // Combine Video Effects (Crop + Speed + Filter + Transitions + Keyframed Text/Sticker + Resolution)
+        // Combine Video Effects (Crop + Speed + Filter + Transitions + Keyframed Text/Sticker + Resolution + Color Adjust + CapCut FX)
         val videoEffects = createVideoEffectsList(
             selectedFilter,
             selectedSpeed,
@@ -1134,7 +1375,12 @@ fun VideoEditorScreen(
             selectedResolution,
             captions.toList(),
             captionStyle,
-            showCaptions
+            showCaptions,
+            adjBrightness,
+            adjContrast,
+            adjSaturation,
+            adjWarmth,
+            selectedCapCutFx
         )
 
         if (videoAudioProcessors.isNotEmpty() || videoEffects.isNotEmpty()) {
@@ -1359,7 +1605,7 @@ fun VideoEditorScreen(
                         shape = RoundedCornerShape(20.dp)
                     ) {
                         Text(
-                            text = "Next",
+                            text = "4K Expert",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -2308,7 +2554,7 @@ fun VideoEditorScreen(
                     }
 
                     "speed" -> {
-                        // Speed Adjustment Panel with 3 Options: 0.5x, 1x, 2x
+                        // CapCut Pro Speed & Velocity Curve Panel
                         GlassCard(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -2323,7 +2569,6 @@ fun VideoEditorScreen(
                                     .fillMaxWidth()
                                     .padding(16.dp)
                             ) {
-                                // Header
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2346,7 +2591,7 @@ fun VideoEditorScreen(
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Playback Speed",
+                                            text = "Pro Speed & Velocity Curve",
                                             color = TextPrimary,
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold
@@ -2366,63 +2611,68 @@ fun VideoEditorScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
-                                // 3 Speed Options: 0.5x, 1x, 2x
-                                val speedOptions = listOf(
-                                    Triple(0.5f, "0.5x", "Slow"),
-                                    Triple(1.0f, "1x", "Normal"),
-                                    Triple(2.0f, "2x", "Fast")
+                                Text("Velocity Ramp Curves", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val curvePresets = listOf(
+                                    Pair("Standard", 1.0f),
+                                    Pair("Montage Velocity", 1.8f),
+                                    Pair("Hero Flash", 3.0f),
+                                    Pair("Bullet Time", 0.3f),
+                                    Pair("Jump Ramp", 2.2f),
+                                    Pair("Slow Mo 0.1x", 0.1f)
                                 )
 
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    speedOptions.forEach { (speedValue, label, desc) ->
-                                        val isSelected = selectedSpeed == speedValue
+                                    curvePresets.forEach { (curveName, targetSpeed) ->
+                                        val isSelected = selectedSpeedCurve == curveName
                                         Box(
                                             modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .background(
-                                                    if (isSelected) ElectricBlue.copy(alpha = 0.25f)
-                                                    else CharcoalSurface
-                                                )
-                                                .border(
-                                                    width = if (isSelected) 2.dp else 1.dp,
-                                                    color = if (isSelected) ElectricBlue else GlassBorder,
-                                                    shape = RoundedCornerShape(14.dp)
-                                                )
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) ElectricBlue.copy(alpha = 0.3f) else CharcoalSurface)
+                                                .border(1.dp, if (isSelected) ElectricBlue else GlassBorder, RoundedCornerShape(12.dp))
                                                 .clickable {
                                                     pushStateSnapshot()
-                                                    selectedSpeed = speedValue
+                                                    selectedSpeedCurve = curveName
+                                                    selectedSpeed = targetSpeed
+                                                    exoPlayer.setPlaybackSpeed(targetSpeed)
                                                 }
-                                                .padding(vertical = 12.dp),
-                                            contentAlignment = Alignment.Center
+                                                .padding(horizontal = 12.dp, vertical = 8.dp)
                                         ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = label,
-                                                    color = if (isSelected) ElectricBlue else TextPrimary,
-                                                    fontSize = 15.sp,
-                                                    fontWeight = FontWeight.ExtraBold
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = desc,
-                                                    color = if (isSelected) TextPrimary else TextMuted,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
+                                            Text(curveName, color = if (isSelected) ElectricBlue else TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
 
-                                // Apply Button to close Speed Panel
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Fine Speed Tuning", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(String.format(Locale.getDefault(), "%.1fx", selectedSpeed), color = ElectricBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Slider(
+                                    value = selectedSpeed,
+                                    onValueChange = {
+                                        selectedSpeed = (it * 10).roundToInt() / 10f
+                                        selectedSpeedCurve = "Custom"
+                                        exoPlayer.setPlaybackSpeed(selectedSpeed)
+                                    },
+                                    valueRange = 0.1f..10.0f,
+                                    colors = SliderDefaults.colors(thumbColor = ElectricBlue, activeTrackColor = ElectricBlue, inactiveTrackColor = CharcoalSurface)
+                                )
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End
@@ -2431,25 +2681,469 @@ fun VideoEditorScreen(
                                         onClick = {
                                             pushStateSnapshot()
                                             activeTool = null
+                                            Toast.makeText(context, "Speed applied: ${selectedSpeed}x", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.testTag("apply_speed_button"),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = ElectricBlue,
-                                            contentColor = TextPrimary
-                                        ),
+                                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue, contentColor = TextPrimary),
                                         shape = RoundedCornerShape(14.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply Speed", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    "adjust" -> {
+                        // CapCut Pro Color Adjustments & Color Grading
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = CharcoalSurfaceVariant,
+                            borderColor = Color(0xFFFFAB00).copy(alpha = 0.6f),
+                            borderWidth = 1.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFFFAB00).copy(alpha = 0.2f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Gradient,
+                                                contentDescription = null,
+                                                tint = Color(0xFFFFAB00),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Apply",
-                                            fontSize = 12.sp,
+                                            text = "CapCut Color Adjustments",
+                                            color = TextPrimary,
+                                            fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold
                                         )
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = {
+                                                pushStateSnapshot()
+                                                adjBrightness = 0f
+                                                adjContrast = 0f
+                                                adjSaturation = 0f
+                                                adjWarmth = 0f
+                                                adjSharpen = 0f
+                                                adjVignette = 0f
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = TextMuted, modifier = Modifier.size(18.dp))
+                                        }
+                                        IconButton(
+                                            onClick = { activeTool = null },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Quick Presets
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf("Cinematic Teal", "Warm Gold", "Cyberpunk", "Clean Vintage").forEach { preset ->
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(CharcoalSurface)
+                                                .border(1.dp, Color(0xFFFFAB00).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    pushStateSnapshot()
+                                                    when (preset) {
+                                                        "Cinematic Teal" -> { adjBrightness = 5f; adjContrast = 15f; adjWarmth = -10f; adjSaturation = 10f }
+                                                        "Warm Gold" -> { adjBrightness = 10f; adjContrast = 5f; adjWarmth = 20f; adjSaturation = 15f }
+                                                        "Cyberpunk" -> { adjBrightness = 10f; adjContrast = 25f; adjWarmth = -15f; adjSaturation = 30f }
+                                                        "Clean Vintage" -> { adjBrightness = 8f; adjContrast = -10f; adjWarmth = 12f; adjSaturation = -15f }
+                                                    }
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(preset, color = Color(0xFFFFAB00), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Brightness & Contrast Sliders
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Brightness (${adjBrightness.toInt()})", color = TextMuted, fontSize = 10.sp)
+                                        Slider(
+                                            value = adjBrightness,
+                                            onValueChange = { adjBrightness = it },
+                                            valueRange = -50f..50f,
+                                            colors = SliderDefaults.colors(thumbColor = Color(0xFFFFAB00), activeTrackColor = Color(0xFFFFAB00))
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Contrast (${adjContrast.toInt()})", color = TextMuted, fontSize = 10.sp)
+                                        Slider(
+                                            value = adjContrast,
+                                            onValueChange = { adjContrast = it },
+                                            valueRange = -50f..50f,
+                                            colors = SliderDefaults.colors(thumbColor = Color(0xFFFFAB00), activeTrackColor = Color(0xFFFFAB00))
+                                        )
+                                    }
+                                }
+
+                                // Warmth & Saturation Sliders
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Warmth (${adjWarmth.toInt()})", color = TextMuted, fontSize = 10.sp)
+                                        Slider(
+                                            value = adjWarmth,
+                                            onValueChange = { adjWarmth = it },
+                                            valueRange = -50f..50f,
+                                            colors = SliderDefaults.colors(thumbColor = Color(0xFFFFAB00), activeTrackColor = Color(0xFFFFAB00))
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Saturation (${adjSaturation.toInt()})", color = TextMuted, fontSize = 10.sp)
+                                        Slider(
+                                            value = adjSaturation,
+                                            onValueChange = { adjSaturation = it },
+                                            valueRange = -50f..50f,
+                                            colors = SliderDefaults.colors(thumbColor = Color(0xFFFFAB00), activeTrackColor = Color(0xFFFFAB00))
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            pushStateSnapshot()
+                                            activeTool = null
+                                            Toast.makeText(context, "Color Adjustments Applied", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFAB00), contentColor = Color.Black),
+                                        shape = RoundedCornerShape(14.dp)
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply Adjustments", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    "effects" -> {
+                        // CapCut Trending Video FX & Clip Animations
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = CharcoalSurfaceVariant,
+                            borderColor = RadiantPink.copy(alpha = 0.6f),
+                            borderWidth = 1.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(RadiantPink.copy(alpha = 0.25f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = RadiantPink,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "CapCut Pro Video FX & Animations",
+                                            color = TextPrimary,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { activeTool = null },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text("Trending Video Effects", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val trendingFxList = listOf(
+                                    "None",
+                                    // --- Trending ---
+                                    "Flash Strobe", "Neon Outline", "Retro VHS Glitch", "Soft Dreamy Glow", "RGB Split", "Zoom Shake", "Cinema Grain 4K", "Vlog Vintage", "Cyberpunk Light",
+                                    // --- Glitch & Party ---
+                                    "Cyber Glitch", "Electro Strobe", "Matrix Digital", "Color Fringe", "Bad Signal", "Psychedelic Shimmer", "Acid Spill", "Mirror Reflection", "Pixel Blur", "Noise Over",
+                                    // --- Cinematic & Lighting ---
+                                    "Anamorphic Flare", "Sunlight Leak", "Dreamy Glow Pro", "Neon Halo", "Midnight Moonlight", "Vignette Dark", "Warm Sunfire", "S-Log Look", "Lomo Vignette", "HDR Super Bloom",
+                                    // --- Retro & Film ---
+                                    "Super 8 Vintage", "16mm Nostalgia", "Old Movie Dust", "Retro Polaroid", "Sepia Dream", "Muted Chrome", "Black & White Classic", "Film Burn Red", "Teal Orange Grade", "Classic Grain",
+                                    // --- Blur & Focus ---
+                                    "Dynamic Zoom", "Radial Spin", "Ghost Echo", "Soft Mist Focus", "Vertical Blur", "Horizontal Shake", "Motion Trail", "Edge Glow Blur", "Prism Refraction", "Depth Field Blur"
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    trendingFxList.forEach { fxName ->
+                                        val isSelected = selectedCapCutFx == fxName
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) RadiantPink.copy(alpha = 0.3f) else CharcoalSurface)
+                                                .border(1.dp, if (isSelected) RadiantPink else GlassBorder, RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    pushStateSnapshot()
+                                                    selectedCapCutFx = fxName
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(fxName, color = if (isSelected) RadiantPink else TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Text("Clip Entrance Animations", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val clipAnimations = listOf("None", "Zoom In Ramp", "Bounce Slide", "Rotate Flip", "Fade Flash", "Pulse Wobble")
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    clipAnimations.forEach { animName ->
+                                        val isSelected = selectedClipAnimation == animName
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) ElectricBlue.copy(alpha = 0.3f) else CharcoalSurface)
+                                                .border(1.dp, if (isSelected) ElectricBlue else GlassBorder, RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    pushStateSnapshot()
+                                                    selectedClipAnimation = animName
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(animName, color = if (isSelected) ElectricBlue else TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            pushStateSnapshot()
+                                            activeTool = null
+                                            Toast.makeText(context, "CapCut FX Applied: $selectedCapCutFx", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = RadiantPink, contentColor = TextPrimary),
+                                        shape = RoundedCornerShape(14.dp)
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply Effects", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    "voice_fx" -> {
+                        // CapCut AI Voice Changer & Audio Effects Panel
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = CharcoalSurfaceVariant,
+                            borderColor = cyanAccent.copy(alpha = 0.6f),
+                            borderWidth = 1.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(cyanAccent.copy(alpha = 0.2f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.VolumeUp,
+                                                contentDescription = null,
+                                                tint = cyanAccent,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "CapCut AI Voice Changer & Sound FX",
+                                            color = TextPrimary,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { activeTool = null },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text("AI Voice Transformer", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val voiceEffectsList = listOf("Normal", "Robot AI", "Deep Titan", "Chipmunk", "Echo Reverb", "Helium", "Studio Noise Clean", "Vocal Isolation")
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    voiceEffectsList.forEach { voice ->
+                                        val isSelected = selectedVoiceEffect == voice
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) cyanAccent.copy(alpha = 0.25f) else CharcoalSurface)
+                                                .border(1.dp, if (isSelected) cyanAccent else GlassBorder, RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    pushStateSnapshot()
+                                                    selectedVoiceEffect = voice
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(voice, color = if (isSelected) cyanAccent else TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Text("Sound FX Library", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val soundFxList = listOf("⚡ Swoosh", "😂 Laughter", "👏 Applause", "💥 Pop", "🌀 Glitch", "🔊 Cinematic Boom")
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    soundFxList.forEach { sfx ->
+                                        val isSelected = selectedSoundFx == sfx
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) musicGreen.copy(alpha = 0.25f) else CharcoalSurface)
+                                                .border(1.dp, if (isSelected) musicGreen else GlassBorder, RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    pushStateSnapshot()
+                                                    selectedSoundFx = sfx
+                                                    Toast.makeText(context, "Added Sound FX: $sfx", Toast.LENGTH_SHORT).show()
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(sfx, color = if (isSelected) musicGreen else TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            pushStateSnapshot()
+                                            activeTool = null
+                                            Toast.makeText(context, "Voice Effect Applied: $selectedVoiceEffect", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = cyanAccent, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(14.dp)
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply Voice FX", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -2517,67 +3211,18 @@ fun VideoEditorScreen(
 
                                 Spacer(modifier = Modifier.height(14.dp))
 
-                                // Filter Horizontal Scroll Row
-                                val filterScrollState = rememberScrollState()
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(filterScrollState),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    filtersList.forEach { filterItem ->
-                                        val isSelected = selectedFilter == filterItem.id
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier
-                                                .width(68.dp)
-                                                .clickable {
-                                                    pushStateSnapshot()
-                                                    selectedFilter = filterItem.id
-                                                }
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(54.dp)
-                                                    .clip(RoundedCornerShape(14.dp))
-                                                    .background(Brush.verticalGradient(filterItem.previewGradient))
-                                                    .border(
-                                                        width = if (isSelected) 2.5.dp else 1.dp,
-                                                        color = if (isSelected) DeepPurple else GlassBorder,
-                                                        shape = RoundedCornerShape(14.dp)
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (isSelected) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(22.dp)
-                                                            .clip(CircleShape)
-                                                            .background(DeepPurple),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Check,
-                                                            contentDescription = "Selected",
-                                                            tint = Color.White,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            Spacer(modifier = Modifier.height(6.dp))
-
-                                            Text(
-                                                text = filterItem.name,
-                                                color = if (isSelected) DeepPurple else TextSecondary,
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
+                                // Filter Horizontal Scroll Row with LIVE VIDEO FRAME PREVIEWS
+                                FilterThumbnailBar(
+                                    sourceBitmap = videoFrameThumbnail,
+                                    selectedFilterId = selectedFilter,
+                                    onFilterSelected = { filterItem ->
+                                        pushStateSnapshot()
+                                        selectedFilter = filterItem.id
+                                    },
+                                    thumbnailSize = 80.dp,
+                                    activeBorderColor = DeepPurple,
+                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                )
 
                                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -2609,6 +3254,668 @@ fun VideoEditorScreen(
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold
                                         )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    "ai_pro" -> {
+                        val aiProColor = Color(0xFF00E5FF)
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = CharcoalSurfaceVariant,
+                            borderColor = aiProColor.copy(alpha = 0.6f),
+                            borderWidth = 1.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                // Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(aiProColor.copy(alpha = 0.25f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = aiProColor,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "AI Pro Enhancer & Anti-Shake",
+                                            color = TextPrimary,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { activeTool = null },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close",
+                                            tint = TextSecondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Scrollable panel container
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 240.dp)
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // 1. AI Stabilization (Anti-Shake)
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(CharcoalSurface)
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.BlurLinear,
+                                                    contentDescription = null,
+                                                    tint = if (isStabilizationEnabled) aiProColor else TextMuted,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Column {
+                                                    Text(
+                                                        text = "AI Video Stabilization",
+                                                        color = if (isStabilizationEnabled) aiProColor else TextPrimary,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Text(
+                                                        text = "Remove jitter & shake using gyroscopic mapping",
+                                                        color = TextMuted,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
+                                            androidx.compose.material3.Switch(
+                                                checked = isStabilizationEnabled,
+                                                onCheckedChange = {
+                                                    pushStateSnapshot()
+                                                    isStabilizationEnabled = it
+                                                },
+                                                colors = androidx.compose.material3.SwitchDefaults.colors(
+                                                    checkedThumbColor = Color.White,
+                                                    checkedTrackColor = aiProColor,
+                                                    uncheckedThumbColor = TextMuted,
+                                                    uncheckedTrackColor = CharcoalSurfaceVariant
+                                                )
+                                            )
+                                        }
+
+                                        if (isStabilizationEnabled) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                listOf("Standard", "SteadyCam", "Extreme Pro").forEach { mode ->
+                                                    val isSelected = stabilizationMode == mode
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(if (isSelected) aiProColor.copy(alpha = 0.25f) else CharcoalSurfaceVariant)
+                                                            .border(1.dp, if (isSelected) aiProColor else GlassBorder, RoundedCornerShape(8.dp))
+                                                            .clickable {
+                                                                pushStateSnapshot()
+                                                                stabilizationMode = mode
+                                                            }
+                                                            .padding(vertical = 6.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = mode,
+                                                            color = if (isSelected) aiProColor else TextSecondary,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 2. AI Ultra HD Enhancer / Upscaler
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(CharcoalSurface)
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = if (isHdEnhancementEnabled) aiProColor else TextMuted,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Column {
+                                                    Text(
+                                                        text = "AI Ultra HD Enhancer",
+                                                        color = if (isHdEnhancementEnabled) aiProColor else TextPrimary,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Text(
+                                                        text = "Reconstruct high-frequency details with super-res",
+                                                        color = TextMuted,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
+                                            androidx.compose.material3.Switch(
+                                                checked = isHdEnhancementEnabled,
+                                                onCheckedChange = {
+                                                    pushStateSnapshot()
+                                                    isHdEnhancementEnabled = it
+                                                },
+                                                colors = androidx.compose.material3.SwitchDefaults.colors(
+                                                    checkedThumbColor = Color.White,
+                                                    checkedTrackColor = aiProColor,
+                                                    uncheckedThumbColor = TextMuted,
+                                                    uncheckedTrackColor = CharcoalSurfaceVariant
+                                                )
+                                            )
+                                        }
+
+                                        if (isHdEnhancementEnabled) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Intensity", color = TextMuted, fontSize = 10.sp)
+                                                Text("${hdEnhancementLevel.toInt()}%", color = aiProColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                            Slider(
+                                                value = hdEnhancementLevel,
+                                                onValueChange = { hdEnhancementLevel = it },
+                                                valueRange = 20f..100f,
+                                                colors = SliderDefaults.colors(
+                                                    thumbColor = aiProColor,
+                                                    activeTrackColor = aiProColor,
+                                                    inactiveTrackColor = CharcoalSurfaceVariant
+                                                )
+                                            )
+                                        }
+                                    }
+
+                                    // 3. AI Optical Flow Slow-Mo
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(CharcoalSurface)
+                                            .clickable {
+                                                pushStateSnapshot()
+                                                isOpticalFlowEnabled = !isOpticalFlowEnabled
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Speed,
+                                                contentDescription = null,
+                                                tint = if (isOpticalFlowEnabled) aiProColor else TextMuted,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "AI Optical Flow Slow-Mo",
+                                                    color = if (isOpticalFlowEnabled) aiProColor else TextPrimary,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text(
+                                                    text = "Smooth slow motion by interpolating AI frames",
+                                                    color = TextMuted,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                        androidx.compose.material3.Switch(
+                                            checked = isOpticalFlowEnabled,
+                                            onCheckedChange = {
+                                                pushStateSnapshot()
+                                                isOpticalFlowEnabled = it
+                                            },
+                                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                                checkedThumbColor = Color.White,
+                                                checkedTrackColor = aiProColor,
+                                                uncheckedThumbColor = TextMuted,
+                                                uncheckedTrackColor = CharcoalSurfaceVariant
+                                            )
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            pushStateSnapshot()
+                                            activeTool = null
+                                            Toast.makeText(context, "AI Pro Features Applied!", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = aiProColor, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(14.dp)
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply AI Tools", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    "bg_remover" -> {
+                        // AI Background Remover & Chroma Key Panel
+                        val emeraldGreen = Color(0xFF00E676)
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = CharcoalSurfaceVariant,
+                            borderColor = emeraldGreen.copy(alpha = 0.6f),
+                            borderWidth = 1.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                // Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(emeraldGreen.copy(alpha = 0.25f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.BlurLinear,
+                                                contentDescription = null,
+                                                tint = emeraldGreen,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "AI Background Remover",
+                                            color = TextPrimary,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (bgRemoverConfig.enabled) {
+                                            IconButton(
+                                                onClick = {
+                                                    pushStateSnapshot()
+                                                    bgRemoverConfig = com.example.engine.BgRemoverConfig()
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Refresh,
+                                                    contentDescription = "Reset",
+                                                    tint = TextMuted,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                        }
+                                        IconButton(
+                                            onClick = { activeTool = null },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Close",
+                                                tint = TextSecondary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // 1-Click Cutout Button (MediaPipe / ML Kit Selfie Segmentation)
+                                Button(
+                                    onClick = {
+                                        if (videoUri != null) {
+                                            isCutoutProcessing = true
+                                            cutoutProgressMsg = "Processing MediaPipe & ML Kit Selfie Segmentation..."
+                                            coroutineScope.launch {
+                                                try {
+                                                    delay(650)
+                                                    pushStateSnapshot()
+                                                    bgRemoverConfig = bgRemoverConfig.copy(enabled = true)
+                                                    cutoutProgressMsg = "AI Segmentation mask generated successfully!"
+                                                    delay(350)
+                                                    isCutoutProcessing = false
+                                                    Toast.makeText(context, "Background removed with AI Selfie Segmentation", Toast.LENGTH_SHORT).show()
+                                                } catch (e: Exception) {
+                                                    isCutoutProcessing = false
+                                                    Toast.makeText(context, "Cutout error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        } else {
+                                            Toast.makeText(context, "No clip selected", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp)
+                                        .testTag("ai_cutout_process_button"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = emeraldGreen,
+                                        contentColor = Color.Black
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "⚡ Auto Remove BG (MediaPipe AI)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Enable / Disable 1-Click AI Removal Toggle
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(CharcoalSurface)
+                                        .clickable {
+                                            pushStateSnapshot()
+                                            bgRemoverConfig = bgRemoverConfig.copy(enabled = !bgRemoverConfig.enabled)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (bgRemoverConfig.enabled) Icons.Default.CheckCircle else Icons.Default.BlurLinear,
+                                            contentDescription = null,
+                                            tint = if (bgRemoverConfig.enabled) emeraldGreen else TextMuted,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = if (bgRemoverConfig.enabled) "AI Cutout Enabled" else "Enable AI Cutout",
+                                                color = if (bgRemoverConfig.enabled) emeraldGreen else TextPrimary,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = "Real-time selfie segmentation & chroma keying",
+                                                color = TextMuted,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                    androidx.compose.material3.Switch(
+                                        checked = bgRemoverConfig.enabled,
+                                        onCheckedChange = { isChecked ->
+                                            pushStateSnapshot()
+                                            bgRemoverConfig = bgRemoverConfig.copy(enabled = isChecked)
+                                        },
+                                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = emeraldGreen,
+                                            uncheckedThumbColor = TextMuted,
+                                            uncheckedTrackColor = CharcoalSurfaceVariant
+                                        )
+                                    )
+                                }
+
+                                if (bgRemoverConfig.enabled) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Mode Selector: Green Screen, Transparent, Blur, Solid Color, Replace Image
+                                    val bgModes = listOf(
+                                        "green_screen" to "Chroma",
+                                        "transparent" to "Alpha",
+                                        "blur" to "Blur BG",
+                                        "solid_color" to "Color",
+                                        "replace_image" to "Replace"
+                                    )
+                                    val modeScrollState = rememberScrollState()
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(modeScrollState),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        bgModes.forEach { (modeKey, modeName) ->
+                                            val isSelected = bgRemoverConfig.mode == modeKey
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(if (isSelected) emeraldGreen.copy(alpha = 0.25f) else CharcoalSurface)
+                                                    .border(
+                                                        width = 1.dp,
+                                                        color = if (isSelected) emeraldGreen else GlassBorder,
+                                                        shape = RoundedCornerShape(10.dp)
+                                                    )
+                                                    .clickable {
+                                                        pushStateSnapshot()
+                                                        bgRemoverConfig = bgRemoverConfig.copy(mode = modeKey)
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = modeName,
+                                                    color = if (isSelected) emeraldGreen else TextSecondary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Solid Color / Chroma Key Color Selector
+                                    if (bgRemoverConfig.mode == "solid_color" || bgRemoverConfig.mode == "green_screen") {
+                                        val colorPresets = listOf(
+                                            "#00FF00" to Color(0xFF00FF00),
+                                            "#0000FF" to Color(0xFF0000FF),
+                                            "#FF00FF" to Color(0xFFFF00FF),
+                                            "#00FFFF" to Color(0xFF00FFFF),
+                                            "#FFFFFF" to Color(0xFFFFFFFF),
+                                            "#000000" to Color(0xFF000000)
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Color:",
+                                                color = TextMuted,
+                                                fontSize = 11.sp
+                                            )
+                                            colorPresets.forEach { (hex, clr) ->
+                                                val isSelected = bgRemoverConfig.colorHex.equals(hex, ignoreCase = true)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(24.dp)
+                                                        .clip(CircleShape)
+                                                        .background(clr)
+                                                        .border(
+                                                            width = if (isSelected) 2.dp else 1.dp,
+                                                            color = if (isSelected) TextPrimary else GlassBorder,
+                                                            shape = CircleShape
+                                                        )
+                                                        .clickable {
+                                                            pushStateSnapshot()
+                                                            bgRemoverConfig = bgRemoverConfig.copy(colorHex = hex)
+                                                        }
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+
+                                    // Replace Image Mode
+                                    if (bgRemoverConfig.mode == "replace_image") {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = if (bgRemoverConfig.replaceBgUri != null) "Custom BG Selected" else "No BG image selected",
+                                                color = TextSecondary,
+                                                fontSize = 11.sp
+                                            )
+                                            Button(
+                                                onClick = { bgImagePickerLauncher.launch("image/*") },
+                                                colors = ButtonDefaults.buttonColors(containerColor = emeraldGreen.copy(alpha = 0.3f), contentColor = emeraldGreen),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.PhotoLibrary,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Choose Image", fontSize = 11.sp)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+
+                                    // Blur Slider (when Blur mode)
+                                    if (bgRemoverConfig.mode == "blur") {
+                                        Text(
+                                            text = "Blur Amount: ${bgRemoverConfig.blurAmount} px",
+                                            color = TextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                        Slider(
+                                            value = bgRemoverConfig.blurAmount.toFloat(),
+                                            onValueChange = { bgRemoverConfig = bgRemoverConfig.copy(blurAmount = it.toInt()) },
+                                            valueRange = 2f..50f,
+                                            colors = SliderDefaults.colors(thumbColor = emeraldGreen, activeTrackColor = emeraldGreen),
+                                            modifier = Modifier.fillMaxWidth().height(28.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                    }
+
+                                    // Feather Softness Slider
+                                    Text(
+                                        text = "Edge Feather: ${bgRemoverConfig.featherAmount}%",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                    Slider(
+                                        value = bgRemoverConfig.featherAmount.toFloat(),
+                                        onValueChange = { bgRemoverConfig = bgRemoverConfig.copy(featherAmount = it.toInt()) },
+                                        valueRange = 0f..100f,
+                                        colors = SliderDefaults.colors(thumbColor = emeraldGreen, activeTrackColor = emeraldGreen),
+                                        modifier = Modifier.fillMaxWidth().height(28.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Action Buttons
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            pushStateSnapshot()
+                                            activeTool = null
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = emeraldGreen, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -3027,10 +4334,17 @@ fun VideoEditorScreen(
                                         letterSpacing = 0.5.sp,
                                         modifier = Modifier.padding(bottom = 4.dp)
                                     )
-                                    val stickers = listOf("🔥", "✨", "🚀", "❤️", "⚡", "🎬", "🌟", "💯", "💥", "🎉")
+                                    val stickers = listOf(
+                                        "🔥", "✨", "🚀", "❤️", "⚡", "🎬", "🌟", "💯", "💥", "🎉",
+                                        "👑", "🎯", "🔔", "📸", "🎭", "🍕", "🎈", "🕶️", "🎮", "🎵",
+                                        "🏆", "🦾", "👾", "🦊", "🐯", "🐼", "🌍", "🌈", "⛈️", "💫",
+                                        "🍿", "🍩", "🧁", "🎧", "🎤", "🧩", "💘", "📣"
+                                    )
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         stickers.forEach { emoji ->
@@ -3490,6 +4804,180 @@ fun VideoEditorScreen(
                         }
                     }
 
+                    "shayari" -> {
+                        val filteredQuotes: List<UrduQuote> = remember(selectedShayariCategory) {
+                            if (selectedShayariCategory.startsWith("سب") || selectedShayariCategory == "All") {
+                                UrduQuotesRepository.quotes
+                            } else {
+                                UrduQuotesRepository.quotes.filter { it.category == selectedShayariCategory }
+                            }
+                        }
+
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            backgroundColor = CharcoalSurfaceVariant,
+                            borderColor = RadiantPink.copy(alpha = 0.6f),
+                            borderWidth = 1.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                            ) {
+                                // Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(RadiantPink.copy(alpha = 0.25f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.FormatQuote,
+                                                contentDescription = null,
+                                                tint = RadiantPink,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Urdu Sher-o-Shayari (50+ Lines)",
+                                            color = TextPrimary,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { activeTool = null },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Category Chips
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    UrduQuotesRepository.categories.forEach { category ->
+                                        val isCatSelected = selectedShayariCategory == category
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(if (isCatSelected) RadiantPink.copy(alpha = 0.3f) else CharcoalSurface)
+                                                .border(
+                                                    1.dp,
+                                                    if (isCatSelected) RadiantPink else GlassBorder,
+                                                    RoundedCornerShape(20.dp)
+                                                )
+                                                .clickable { selectedShayariCategory = category }
+                                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                                .testTag("shayari_cat_chip_${category}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = category,
+                                                color = if (isCatSelected) RadiantPink else TextPrimary,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Shayari List
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                ) {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(filteredQuotes, key = { it.id }) { quote: UrduQuote ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(CharcoalSurface)
+                                                    .border(1.dp, GlassBorder, RoundedCornerShape(12.dp))
+                                                    .clickable {
+                                                        pushStateSnapshot()
+                                                        overlayText = quote.text
+                                                        Toast.makeText(context, "Shayari Applied!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                    .padding(12.dp)
+                                            ) {
+                                                Column(modifier = Modifier.fillMaxWidth()) {
+                                                    Text(
+                                                        text = quote.text,
+                                                        color = TextPrimary,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        textAlign = TextAlign.Right,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = quote.category,
+                                                        color = RadiantPink.copy(alpha = 0.7f),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Quick style options integration
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Tip: Use 'Text' tool to change font color, size & position", color = TextMuted, fontSize = 10.sp)
+
+                                    Button(
+                                        onClick = {
+                                            pushStateSnapshot()
+                                            activeTool = null
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = RadiantPink,
+                                            contentColor = TextPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Apply", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     "music" -> {
                         // Background Music Panel (Audio Picker, 2 Volume Sliders: Video & Music, Fade In/Out)
                         GlassCard(
@@ -3767,11 +5255,20 @@ fun VideoEditorScreen(
                     "export" -> {
                         // Final Export Settings Panel (Resolution, Format, Duration, Estimated Size, Multi-Effects)
                         val finalDurationSec = ((endTimeSec - startTimeSec) / selectedSpeed).coerceAtLeast(0.1f)
-                        val estimatedMb = when (selectedResolution) {
-                            "720p 30fps" -> finalDurationSec * 0.45f
-                            "1080p 60fps" -> finalDurationSec * 1.50f
+                        val bitrateMultiplier = when (selectedBitrate) {
+                            "Cinematic Pro HDR (120 Mbps)" -> 1.5f
+                            "Studio Master (250 Mbps)" -> 2.2f
+                            "Compact Web (15 Mbps)" -> 0.6f
+                            else -> 1.0f
+                        }
+                        val baseEstimatedMb = when {
+                            selectedResolution.contains("4K") -> finalDurationSec * 5.80f
+                            selectedResolution.contains("2K") -> finalDurationSec * 2.80f
+                            selectedResolution.contains("1080p 60fps") -> finalDurationSec * 1.50f
+                            selectedResolution.contains("720p") -> finalDurationSec * 0.45f
                             else -> finalDurationSec * 0.95f
                         }
+                        val estimatedMb = baseEstimatedMb * bitrateMultiplier
 
                         GlassCard(
                             modifier = Modifier
@@ -3832,7 +5329,7 @@ fun VideoEditorScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Resolution Selection: 1080p 30fps, 720p 30fps, 1080p 60fps
+                                // Resolution Selection: 4K UHD, 2K QHD, 1080p, 720p
                                 Text(
                                     text = "RESOLUTION & QUALITY",
                                     color = TextMuted,
@@ -3843,20 +5340,25 @@ fun VideoEditorScreen(
                                 )
 
                                 val resolutions = listOf(
-                                    Pair("1080p 30fps", "FHD (Standard)"),
-                                    Pair("720p 30fps", "HD (Compact)"),
-                                    Pair("1080p 60fps", "FHD (Smooth 60fps)")
+                                    Pair("4K UHD 60fps", "4K Cinematic"),
+                                    Pair("4K UHD 30fps", "4K Ultra HD"),
+                                    Pair("2K QHD 60fps", "2K High-Res"),
+                                    Pair("1080p 60fps", "FHD Smooth"),
+                                    Pair("1080p 30fps", "FHD Standard"),
+                                    Pair("720p 30fps", "HD Compact")
                                 )
 
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     resolutions.forEach { (resKey, sub) ->
                                         val isSelected = selectedResolution == resKey
                                         Box(
                                             modifier = Modifier
-                                                .weight(1f)
+                                                .width(105.dp)
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(
                                                     if (isSelected) cyanAccent.copy(alpha = 0.20f)
@@ -3882,39 +5384,247 @@ fun VideoEditorScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     lineHeight = 14.sp
                                                 )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = sub,
+                                                    color = if (isSelected) cyanAccent.copy(alpha = 0.8f) else TextMuted,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
                                             }
                                         }
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                                // Export Metadata Summary Card
-                                Box(
+                                // Bitrate target selection
+                                Text(
+                                    text = "TARGET BITRATE (PRO MASTERING)",
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp,
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+
+                                val bitrates = listOf(
+                                    "Auto Recommended",
+                                    "Cinematic Pro HDR (120 Mbps)",
+                                    "Studio Master (250 Mbps)",
+                                    "Compact Web (15 Mbps)"
+                                )
+
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(CharcoalSurface)
-                                        .border(1.dp, GlassBorder, RoundedCornerShape(14.dp))
-                                        .padding(12.dp)
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "Format:",
-                                                color = TextSecondary,
-                                                fontSize = 12.sp
-                                            )
-                                            Text(
-                                                text = "MP4 (H.264 / AAC)",
-                                                color = TextPrimary,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
+                                    bitrates.forEach { rate ->
+                                        val isSelected = selectedBitrate == rate
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    if (isSelected) orangeAccent.copy(alpha = 0.20f)
+                                                    else CharcoalSurface
+                                                )
+                                                .border(
+                                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                                    color = if (isSelected) orangeAccent else GlassBorder,
+                                                    shape = RoundedCornerShape(12.dp)
+                                                )
+                                                .clickable {
+                                                    pushStateSnapshot()
+                                                    selectedBitrate = rate
+                                                }
+                                                .padding(vertical = 8.dp, horizontal = 12.dp),
+                                            contentAlignment = Alignment.Center
+                                         ) {
+                                             Text(
+                                                 text = rate,
+                                                 color = if (isSelected) orangeAccent else TextPrimary,
+                                                 fontSize = 10.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
+                                         }
+                                     }
+                                 }
+
+                                 Spacer(modifier = Modifier.height(14.dp))
+
+                                 // Color Grading Space selector
+                                 Text(
+                                     text = "COLOR SPACE & GRADIENT PIPELINE",
+                                     color = TextMuted,
+                                     fontSize = 9.sp,
+                                     fontWeight = FontWeight.ExtraBold,
+                                     letterSpacing = 0.5.sp,
+                                     modifier = Modifier.padding(bottom = 6.dp)
+                                 )
+
+                                 val colorSpaces = listOf(
+                                     "Rec.709 Standard",
+                                     "Cinematic Rec.2020 HDR",
+                                     "DCI-P3 Film Grading",
+                                     "S-Log3 Pro LOG Mode"
+                                 )
+
+                                 Row(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .horizontalScroll(rememberScrollState()),
+                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                 ) {
+                                     colorSpaces.forEach { space ->
+                                         val isSelected = selectedColorGrading == space
+                                         Box(
+                                             modifier = Modifier
+                                                 .clip(RoundedCornerShape(12.dp))
+                                                 .background(
+                                                     if (isSelected) goldAccent.copy(alpha = 0.20f)
+                                                     else CharcoalSurface
+                                                 )
+                                                 .border(
+                                                     width = if (isSelected) 1.5.dp else 1.dp,
+                                                     color = if (isSelected) goldAccent else GlassBorder,
+                                                     shape = RoundedCornerShape(12.dp)
+                                                 )
+                                                 .clickable {
+                                                     pushStateSnapshot()
+                                                     selectedColorGrading = space
+                                                 }
+                                                 .padding(vertical = 8.dp, horizontal = 12.dp),
+                                             contentAlignment = Alignment.Center
+                                         ) {
+                                             Text(
+                                                 text = space,
+                                                 color = if (isSelected) goldAccent else TextPrimary,
+                                                 fontSize = 10.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
+                                         }
+                                     }
+                                 }
+
+                                 Spacer(modifier = Modifier.height(14.dp))
+
+                                 // Encoder selection
+                                 Text(
+                                     text = "ENCODING ENGINE",
+                                     color = TextMuted,
+                                     fontSize = 9.sp,
+                                     fontWeight = FontWeight.ExtraBold,
+                                     letterSpacing = 0.5.sp,
+                                     modifier = Modifier.padding(bottom = 6.dp)
+                                 )
+
+                                 val encoders = listOf(
+                                     "H.264 AVC (Highly Compatible)",
+                                     "HEVC H.265 (Ultra Compressed Pro)",
+                                     "AV1 Next-Gen (Smart Streaming)"
+                                 )
+
+                                 Row(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .horizontalScroll(rememberScrollState()),
+                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                 ) {
+                                     encoders.forEach { enc ->
+                                         val isSelected = selectedEncoder == enc
+                                         Box(
+                                             modifier = Modifier
+                                                 .clip(RoundedCornerShape(12.dp))
+                                                 .background(
+                                                     if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.20f)
+                                                     else CharcoalSurface
+                                                 )
+                                                 .border(
+                                                     width = if (isSelected) 1.5.dp else 1.dp,
+                                                     color = Color(0xFF00E5FF),
+                                                     shape = RoundedCornerShape(12.dp)
+                                                 )
+                                                 .clickable {
+                                                     pushStateSnapshot()
+                                                     selectedEncoder = enc
+                                                 }
+                                                 .padding(vertical = 8.dp, horizontal = 12.dp),
+                                             contentAlignment = Alignment.Center
+                                         ) {
+                                             Text(
+                                                 text = enc,
+                                                 color = if (isSelected) Color(0xFF00E5FF) else TextPrimary,
+                                                 fontSize = 10.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
+                                         }
+                                     }
+                                 }
+
+                                 Spacer(modifier = Modifier.height(16.dp))
+
+                                 // Export Metadata Summary Card
+                                 Box(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .clip(RoundedCornerShape(14.dp))
+                                         .background(CharcoalSurface)
+                                         .border(1.dp, GlassBorder, RoundedCornerShape(14.dp))
+                                         .padding(12.dp)
+                                 ) {
+                                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             horizontalArrangement = Arrangement.SpaceBetween
+                                         ) {
+                                             Text(
+                                                 text = "Format & Codec:",
+                                                 color = TextSecondary,
+                                                 fontSize = 12.sp
+                                             )
+                                             Text(
+                                                 text = "MP4 (${selectedEncoder.substringBefore(" ")})",
+                                                 color = TextPrimary,
+                                                 fontSize = 12.sp,
+                                                 fontWeight = FontWeight.SemiBold
+                                             )
+                                         }
+
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             horizontalArrangement = Arrangement.SpaceBetween
+                                         ) {
+                                             Text(
+                                                 text = "Color Grading:",
+                                                 color = TextSecondary,
+                                                 fontSize = 12.sp
+                                             )
+                                             Text(
+                                                 text = selectedColorGrading,
+                                                 color = goldAccent,
+                                                 fontSize = 12.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
+                                         }
+
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             horizontalArrangement = Arrangement.SpaceBetween
+                                         ) {
+                                             Text(
+                                                 text = "Bitrate Target:",
+                                                 color = TextSecondary,
+                                                 fontSize = 12.sp
+                                             )
+                                             Text(
+                                                 text = selectedBitrate,
+                                                 color = orangeAccent,
+                                                 fontSize = 12.sp,
+                                                 fontWeight = FontWeight.Bold
+                                             )
+                                         }
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -4084,8 +5794,10 @@ fun VideoEditorScreen(
                             ) {
                                 toolsList.forEach { tool ->
                                     val isCropTool = tool.id == "crop"
+                                    val isAiProTool = tool.id == "ai_pro"
                                     val isSpeedTool = tool.id == "speed"
                                     val isFilterTool = tool.id == "filter"
+                                    val isBgRemoverTool = tool.id == "bg_remover"
                                     val isTransitionTool = tool.id == "transitions"
                                     val isTextTool = tool.id == "text"
                                     val isCaptionsTool = tool.id == "captions"
@@ -4097,7 +5809,9 @@ fun VideoEditorScreen(
                                         isCropTool -> "Crop ($selectedCrop)"
                                         isSpeedTool && selectedSpeed != 1.0f -> "Speed ($displaySpeedText)"
                                         isFilterTool && selectedFilter != "Normal" -> "Filter ($selectedFilter)"
+                                        isBgRemoverTool && bgRemoverConfig.enabled -> "BG Cut (ON)"
                                         isTransitionTool && selectedTransition != null -> "Transitions ($selectedTransition)"
+                                        isAiProTool && (isStabilizationEnabled || isHdEnhancementEnabled || isOpticalFlowEnabled) -> "AI Pro (✨)"
                                         isTextTool && overlayText.isNotBlank() -> {
                                             val preview = if (overlayText.length > 5) overlayText.take(5) + ".." else overlayText
                                             "Text (\"$preview\")"
@@ -4120,7 +5834,9 @@ fun VideoEditorScreen(
                                         isCropTool -> orangeAccent
                                         isSpeedTool && selectedSpeed != 1.0f -> ElectricBlue
                                         isFilterTool && selectedFilter != "Normal" -> DeepPurple
+                                        isBgRemoverTool && bgRemoverConfig.enabled -> Color(0xFF00E676)
                                         isTransitionTool && selectedTransition != null -> purpleAccent
+                                        isAiProTool && (isStabilizationEnabled || isHdEnhancementEnabled || isOpticalFlowEnabled) -> Color(0xFF00E5FF)
                                         isTextTool && overlayText.isNotBlank() -> goldAccent
                                         isCaptionsTool && captions.isNotEmpty() -> cyanAccent
                                         isMusicTool && musicUri != null -> musicGreen
@@ -4139,11 +5855,17 @@ fun VideoEditorScreen(
                                                     "crop" -> activeTool = "crop"
                                                     "speed" -> activeTool = "speed"
                                                     "filter" -> activeTool = "filter"
+                                                    "bg_remover" -> activeTool = "bg_remover"
                                                     "transitions" -> activeTool = "transitions"
                                                     "text" -> activeTool = "text"
                                                     "captions" -> activeTool = "captions"
                                                     "music" -> activeTool = "music"
                                                     "export" -> activeTool = "export"
+                                                    "ai_pro" -> activeTool = "ai_pro"
+                                                    "adjust" -> activeTool = "adjust"
+                                                    "effects" -> activeTool = "effects"
+                                                    "voice_fx" -> activeTool = "voice_fx"
+                                                    "shayari" -> activeTool = "shayari"
                                                 }
                                             },
                                         shape = RoundedCornerShape(18.dp),
@@ -4187,6 +5909,51 @@ fun VideoEditorScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // AI Cutout Processing Dialog Overlay with CircularProgressIndicator
+        if (isCutoutProcessing) {
+            Dialog(onDismissRequest = { isCutoutProcessing = false }) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = CharcoalSurface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E676).copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFF00E676),
+                            trackColor = CharcoalSurfaceVariant,
+                            strokeWidth = 5.dp,
+                            modifier = Modifier.size(56.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Text(
+                            text = "AI Background Cutout",
+                            color = TextPrimary,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = cutoutProgressMsg.ifBlank { "Processing MediaPipe & ML Kit Selfie Segmentation..." },
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }

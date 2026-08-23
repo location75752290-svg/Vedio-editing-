@@ -21,22 +21,32 @@ class GeminiAiIntegrationLayer {
 
     private val baseUrl = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    val isApiKeyConfigured: Boolean
+    val resolvedApiKey: String
         get() = try {
-            val key = BuildConfig.GEMINI_API_KEY
-            key.isNotBlank() && key != "MY_GEMINI_API_KEY"
+            val googleKey = BuildConfig.GOOGLE_API_KEY
+            val geminiKey = BuildConfig.GEMINI_API_KEY
+            if (googleKey.isNotBlank() && googleKey != "MY_GOOGLE_API_KEY") {
+                googleKey
+            } else if (geminiKey.isNotBlank() && geminiKey != "MY_GEMINI_API_KEY") {
+                geminiKey
+            } else {
+                ""
+            }
         } catch (e: Exception) {
-            false
+            try { BuildConfig.GEMINI_API_KEY } catch (e2: Exception) { "" }
         }
+
+    val isApiKeyConfigured: Boolean
+        get() = resolvedApiKey.isNotBlank() && resolvedApiKey != "MY_GEMINI_API_KEY" && resolvedApiKey != "MY_GOOGLE_API_KEY"
 
     /**
      * AI Text to Video Script & Scene Prompt Generation
      */
     suspend fun generateTextToVideoPrompt(userPrompt: String): Result<String> = withContext(Dispatchers.IO) {
         if (!isApiKeyConfigured) {
-            return@withContext Result.failure(IllegalStateException("Gemini API Key is not configured. Please add your key in AI Studio Secrets."))
+            return@withContext Result.failure(IllegalStateException("Please add API Key in Secrets"))
         }
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = resolvedApiKey
 
         val requestJson = JSONObject().apply {
             put("contents", JSONArray().apply {
@@ -92,7 +102,7 @@ class GeminiAiIntegrationLayer {
                 )
             )
         }
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = resolvedApiKey
 
         val requestJson = JSONObject().apply {
             put("contents", JSONArray().apply {
@@ -138,7 +148,7 @@ class GeminiAiIntegrationLayer {
         if (!isApiKeyConfigured) {
             return@withContext Result.success("Here is your AI generated narration for $topic in a $style tone.")
         }
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = resolvedApiKey
 
         val requestJson = JSONObject().apply {
             put("contents", JSONArray().apply {

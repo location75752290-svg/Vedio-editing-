@@ -61,6 +61,7 @@ import com.example.ui.components.NavTab
 import com.example.ui.screens.AiToolsScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.OnboardingScreen
+import com.example.ui.screens.PhotoEditorScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.ProjectsScreen
 import com.example.ui.screens.RemoveBackgroundScreen
@@ -87,7 +88,8 @@ enum class AppScreen {
     MAIN,
     EDITOR,
     REMOVE_BG,
-    VIDEO_EDITOR
+    VIDEO_EDITOR,
+    PHOTO_EDITOR
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,10 +109,18 @@ fun AppNavigation(
             initialVideoUri?.let { getFileNameFromUri(context, it) } ?: "Imported Video"
         )
     }
+    var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var activeVcpProjectData by remember { mutableStateOf<com.example.domain.model.VisionCutProjectData?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedPhotoUri = uri
+        currentScreen = AppScreen.PHOTO_EDITOR
+    }
 
     val vcpFilePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -287,6 +297,17 @@ fun AppNavigation(
                                             onOpenVideoPicker = {
                                                 activeVcpProjectData = null
                                                 openVideoPicker()
+                                            },
+                                            onOpenPhotoPicker = { photoPickerLauncher.launch("image/*") },
+                                            onOpenPhotoEditor = { uri ->
+                                                selectedPhotoUri = uri
+                                                currentScreen = AppScreen.PHOTO_EDITOR
+                                            },
+                                            onOpenDemoVideo = {
+                                                activeVcpProjectData = null
+                                                selectedVideoUri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4")
+                                                selectedVideoFileName = "Try_Demo_Video.mp4"
+                                                currentScreen = AppScreen.VIDEO_EDITOR
                                             }
                                         )
                                     }
@@ -368,130 +389,13 @@ fun AppNavigation(
                         }
                     )
                 }
-            }
-        }
 
-        // Top-Right Quick Screen Switcher Chip (Allows seamless testing of Splash, Onboarding, Welcome, or Home)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 8.dp, end = 12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .testTag("preview_switcher_chip")
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(CharcoalSurface.copy(alpha = 0.92f))
-                    .clickable { showPreviewMenu = !showPreviewMenu }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.SwapHoriz,
-                        contentDescription = "Screen Switcher",
-                        tint = RadiantPink,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = " View: ${
-                            when (currentScreen) {
-                                AppScreen.SPLASH -> "1. Splash"
-                                AppScreen.ONBOARDING -> "2. Onboarding"
-                                AppScreen.WELCOME -> "3. Welcome"
-                                AppScreen.MAIN -> "4. ${currentNavTab.label}"
-                                AppScreen.EDITOR -> "9. Editor"
-                                AppScreen.REMOVE_BG -> "10. Remove BG"
-                                AppScreen.VIDEO_EDITOR -> "Video Editor"
-                            }
-                        }",
-                        color = TextPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                AppScreen.PHOTO_EDITOR -> {
+                    PhotoEditorScreen(
+                        initialPhotoUri = selectedPhotoUri,
+                        onNavigateBack = { currentScreen = AppScreen.MAIN }
                     )
                 }
-            }
-
-            DropdownMenu(
-                expanded = showPreviewMenu,
-                onDismissRequest = { showPreviewMenu = false },
-                modifier = Modifier.background(CharcoalSurface)
-            ) {
-                DropdownMenuItem(
-                    text = { Text("1. Splash Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.SPLASH
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("2. Onboarding (3 Pages)", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.ONBOARDING
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("3. Welcome Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.WELCOME
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("4. Home Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.MAIN
-                        currentNavTab = NavTab.HOME
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("5. Templates Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.MAIN
-                        currentNavTab = NavTab.TEMPLATES
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("6. AI Tools Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.MAIN
-                        currentNavTab = NavTab.AI_TOOLS
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("7. Projects Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.MAIN
-                        currentNavTab = NavTab.PROJECTS
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("8. Profile Screen", color = TextPrimary, fontSize = 13.sp) },
-                    onClick = {
-                        currentScreen = AppScreen.MAIN
-                        currentNavTab = NavTab.PROFILE
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("🎬 9. Timeline Editor", color = ElectricBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                    onClick = {
-                        currentScreen = AppScreen.EDITOR
-                        showPreviewMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("✂️ 10. Remove BG Tool", color = RadiantPink, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                    onClick = {
-                        currentScreen = AppScreen.REMOVE_BG
-                        showPreviewMenu = false
-                    }
-                )
             }
         }
     }

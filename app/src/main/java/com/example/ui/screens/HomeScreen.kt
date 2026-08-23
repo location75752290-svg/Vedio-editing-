@@ -1,9 +1,11 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
@@ -37,6 +40,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VideoCall
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -60,11 +65,31 @@ import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MovieFilter
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.BlurLinear
+import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.Compare
+import androidx.compose.material.icons.filled.Filter
+import androidx.compose.material.icons.filled.Adjust
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Animation
+import androidx.compose.material.icons.filled.Gradient
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
@@ -76,7 +101,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.graphics.BitmapFactory
+import androidx.compose.ui.platform.LocalContext
 import com.example.R
+import com.example.ui.components.FilterThumbnailBar
 import com.example.ui.components.GlassCard
 import com.example.ui.theme.CharcoalSurface
 import com.example.ui.theme.CharcoalSurfaceVariant
@@ -120,9 +148,13 @@ fun HomeScreen(
     onNavigateToProjects: () -> Unit,
     onNavigateToRemoveBg: () -> Unit = {},
     onOpenVideoPicker: () -> Unit = {},
+    onOpenPhotoPicker: () -> Unit = {},
+    onOpenPhotoEditor: (Uri?) -> Unit = {},
+    onOpenDemoVideo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    var homeModeTab by remember { mutableStateOf("Video") } // "Video" | "Photo"
     var selectedAspectRatio by remember { mutableStateOf("9:16") }
     var showProjectSheet by remember { mutableStateOf(false) }
     var vcpProjectsList by remember { mutableStateOf<List<com.example.domain.model.VisionCutProjectData>>(emptyList()) }
@@ -337,7 +369,7 @@ fun HomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         // ==========================================
         // 1. Start New Project (Hero Card with AI Cyberpunk Girl Background)
@@ -513,7 +545,7 @@ fun HomeScreen(
                                         RoundedCornerShape(12.dp)
                                     )
                                     .padding(horizontal = 9.dp, vertical = 5.dp)
-                            ) {
+                                ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.FlashOn,
@@ -576,75 +608,6 @@ fun HomeScreen(
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Aspect Ratio Selector Chips
-                        Text(
-                            text = "ASPECT RATIO",
-                            color = TextMuted,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.5.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            aspectRatios.forEach { ratio ->
-                                val isSelected = ratio.ratioText == selectedAspectRatio
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            if (isSelected) {
-                                                Brush.horizontalGradient(listOf(ElectricBlue, DeepPurple))
-                                            } else {
-                                                Brush.horizontalGradient(
-                                                    listOf(
-                                                        CharcoalSurfaceVariant.copy(alpha = 0.85f),
-                                                        CharcoalSurfaceVariant.copy(alpha = 0.85f)
-                                                    )
-                                                )
-                                            }
-                                        )
-                                        .then(
-                                            if (isSelected) {
-                                                Modifier.border(
-                                                    1.5.dp,
-                                                    Brush.horizontalGradient(listOf(RadiantPink, ElectricBlue)),
-                                                    RoundedCornerShape(14.dp)
-                                                )
-                                            } else Modifier.border(
-                                                0.5.dp,
-                                                GlassBorder,
-                                                RoundedCornerShape(14.dp)
-                                            )
-                                        )
-                                        .clickable { selectedAspectRatio = ratio.ratioText }
-                                        .padding(vertical = 10.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                            text = ratio.ratioText,
-                                            color = TextPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-                                        Text(
-                                            text = ratio.label,
-                                            color = if (isSelected) TextPrimary else TextMuted,
-                                            fontSize = 9.sp
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -772,6 +735,138 @@ fun HomeScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
+                                }
+                            }
+
+                            // Action 5: Try Demo Video 🎬 (Premium Glow)
+                            Box(
+                                modifier = Modifier
+                                    .testTag("home_try_demo_video")
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(
+                                        Brush.horizontalGradient(listOf(ElectricBlue, RadiantPink))
+                                    )
+                                    .clickable { onOpenDemoVideo() }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = TextPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "  Try with Demo Video 🎬",
+                                        color = TextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ==========================================
+        // PRO VIDEO STUDIO SUITE (8 Tools Grid)
+        // ==========================================
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Pro Video Tools Suite 🎬",
+                    color = TextPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "50+ CapCut Tools",
+                    color = ElectricBlue,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Video Tools Grid Rows
+            val videoToolsList = listOf(
+                Triple("50+ CapCut FX", "Glitch • Shake • RGB", Icons.Default.AutoAwesome to RadiantPink),
+                Triple("Urdu Shayari 📜", "Quotes & Poetry", Icons.Default.FormatQuote to ElectricBlue),
+                Triple("Auto Captions", "Karaoke Subtitles", Icons.Default.Subtitles to NeonIndigo),
+                Triple("BG Remover", "Zero Green Screen", Icons.Default.BlurLinear to Color(0xFF00E676)),
+                Triple("Speed Curves", "Velocity Montage", Icons.Default.Speed to ElectricBlue),
+                Triple("Voice FX & Audio", "Robot • Bass • SFX", Icons.Default.VolumeUp to Color(0xFFFFAB00)),
+                Triple("AI 4K Enhancer", "SteadyCam Stabilizer", Icons.Default.HighQuality to Color(0xFF00E5FF)),
+                Triple("Timeline Studio", "Multi-Track & PiP", Icons.Default.Layers to DeepPurple)
+            )
+
+            for (i in videoToolsList.indices step 2) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    for (j in 0..1) {
+                        val item = videoToolsList[i + j]
+                        GlassCard(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (item.first.contains("BG Remover")) onNavigateToRemoveBg()
+                                    else onOpenDemoVideo()
+                                },
+                            shape = RoundedCornerShape(18.dp),
+                            backgroundColor = CharcoalSurface
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(item.third.second.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = item.third.first,
+                                        contentDescription = item.first,
+                                        tint = item.third.second,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = item.first,
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = item.second,
+                                        color = TextMuted,
+                                        fontSize = 10.sp
+                                    )
                                 }
                             }
                         }
@@ -1922,7 +2017,10 @@ fun HomeScreen(
                 GlassCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
-                    onClick = { showProjectSheet = false }
+                    onClick = {
+                        showProjectSheet = false
+                        onOpenVideoPicker()
+                    }
                 ) {
                     Row(
                         modifier = Modifier
@@ -1937,6 +2035,36 @@ fun HomeScreen(
                         )
                         Text(
                             text = "  Select Video Clips from Gallery",
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    onClick = {
+                        showProjectSheet = false
+                        onOpenDemoVideo()
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = ElectricBlue
+                        )
+                        Text(
+                            text = "  Try with Demo Video 🎬",
                             color = TextPrimary,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold
