@@ -369,16 +369,644 @@ fun HomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // ==========================================
-        // 1. Start New Project (Hero Card with AI Cyberpunk Girl Background)
+        // Top 2 Tabs: "Video" | "Photo"
         // ==========================================
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(CharcoalSurface)
+                .border(1.dp, GlassBorder, RoundedCornerShape(20.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // Video Tab Button
+            val isVideoActive = homeModeTab == "Video"
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (isVideoActive) Brush.horizontalGradient(listOf(ElectricBlue, DeepPurple))
+                        else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                    )
+                    .clickable { homeModeTab = "Video" }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.MovieFilter,
+                        contentDescription = "Video",
+                        tint = if (isVideoActive) TextPrimary else TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Video",
+                        color = if (isVideoActive) TextPrimary else TextMuted,
+                        fontSize = 14.sp,
+                        fontWeight = if (isVideoActive) FontWeight.ExtraBold else FontWeight.Medium
+                    )
+                }
+            }
+
+            // Photo Tab Button
+            val isPhotoActive = homeModeTab == "Photo"
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (isPhotoActive) Brush.horizontalGradient(listOf(RadiantPink, DeepPurple))
+                        else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                    )
+                    .clickable { homeModeTab = "Photo" }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = "Photo",
+                        tint = if (isPhotoActive) TextPrimary else TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Photo",
+                        color = if (isPhotoActive) TextPrimary else TextMuted,
+                        fontSize = 14.sp,
+                        fontWeight = if (isPhotoActive) FontWeight.ExtraBold else FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // ==========================================
+        // ⚡ 1-Tap Quick Pro Studio Tools Bar
+        // ==========================================
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = RadiantPink,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Quick Launch Pro Studio",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = "Tap to Test 🚀",
+                    color = ElectricBlue,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // 1. CapCut 50+ FX
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(RadiantPink.copy(alpha = 0.25f), DeepPurple.copy(alpha = 0.35f)))
+                        )
+                        .border(1.dp, RadiantPink.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .clickable { onOpenDemoVideo() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(RadiantPink),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("50+ CapCut FX", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Glitch • Shake • RGB", color = RadiantPink, fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                // 2. Urdu Shayari
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(ElectricBlue.copy(alpha = 0.25f), DeepPurple.copy(alpha = 0.35f)))
+                        )
+                        .border(1.dp, ElectricBlue.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .clickable { onOpenDemoVideo() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(ElectricBlue),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FormatQuote,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Urdu Shayari 📜", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Love • Sad • Poetry", color = ElectricBlue, fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                // 3. Photo Editor
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(DeepPurple.copy(alpha = 0.35f), CharcoalSurfaceVariant))
+                        )
+                        .border(1.dp, DeepPurple.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .clickable { onOpenPhotoEditor(null) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(DeepPurple),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Photo Studio 📸", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("PicsArt Pro • 15 Filters", color = TextSecondary, fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                // 4. Auto Captions
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(NeonIndigo.copy(alpha = 0.35f), CharcoalSurfaceVariant))
+                        )
+                        .border(1.dp, NeonIndigo.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .clickable { onOpenDemoVideo() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(NeonIndigo),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ClosedCaption,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Auto Captions 🎙️", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Karaoke Subtitles", color = TextSecondary, fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                // 5. BG Remover
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFF00E676).copy(alpha = 0.25f), CharcoalSurfaceVariant))
+                        )
+                        .border(1.dp, Color(0xFF00E676).copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .clickable { onNavigateToRemoveBg() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00E676)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.BlurLinear,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("BG Remover ✂️", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Instant AI Cutout", color = Color(0xFF00E676), fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                // 6. Multi-Track Timeline
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFFFFAB00).copy(alpha = 0.25f), CharcoalSurfaceVariant))
+                        )
+                        .border(1.dp, Color(0xFFFFAB00).copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .clickable { onNewProjectClick() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFFAB00)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Layers,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Timeline Studio 🎞️", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Multi-Track & PiP", color = Color(0xFFFFAB00), fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (homeModeTab == "Photo") {
+            // ==========================================
+            // PHOTO FILTER STUDIO (Identical 15 Filters Engine)
+            // ==========================================
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+            ) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    backgroundColor = CharcoalSurface,
+                    borderColor = RadiantPink.copy(alpha = 0.8f),
+                    borderWidth = 1.5.dp
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // AI Hero Studio Background
+                        Image(
+                            painter = painterResource(id = R.drawable.img_hero_studio_bg_1785515965627),
+                            contentDescription = "Photo Filter Background",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(28.dp))
+                        )
+
+                        // Dark Scrim Overlay
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            ObsidianBackground.copy(alpha = 0.55f),
+                                            CharcoalSurface.copy(alpha = 0.75f),
+                                            ObsidianBackground.copy(alpha = 0.90f)
+                                        )
+                                    )
+                                )
+                        )
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.sweepGradient(
+                                                    listOf(RadiantPink, ElectricBlue, DeepPurple, RadiantPink)
+                                                )
+                                            )
+                                            .clickable { onOpenPhotoPicker() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add Photo",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Text(
+                                            text = "Photo Filter Studio",
+                                            color = TextPrimary,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                        Text(
+                                            text = "15 Cinema Filters • 1080p HD Export",
+                                            color = RadiantPink,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(RadiantPink.copy(alpha = 0.25f))
+                                        .border(1.dp, RadiantPink, RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "15 FILTERS",
+                                        color = RadiantPink,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Text(
+                                text = "Apply the exact same cinematic GPU color science from Video directly to your photos. Real-time intensity slider & instant before/after hold comparison.",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // 15 Filters Live Photo Preview Strip
+                            val samplePortraitBmp = remember {
+                                try {
+                                    BitmapFactory.decodeResource(context.resources, R.drawable.user_black_kurta_portrait_1787388838760)
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            FilterThumbnailBar(
+                                sourceBitmap = samplePortraitBmp,
+                                selectedFilterId = "film",
+                                onFilterSelected = { onOpenPhotoEditor(null) },
+                                thumbnailSize = 72.dp,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Primary Action Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = { onOpenPhotoPicker() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = RadiantPink,
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .height(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Select Photo",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { onOpenPhotoEditor(null) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = CharcoalSurfaceVariant,
+                                        contentColor = ElectricBlue
+                                    ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .weight(0.9f)
+                                        .height(44.dp)
+                                        .border(1.dp, ElectricBlue.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Try Demo",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ==========================================
+            // PRO PHOTO STUDIO SUITE (8 Tools Grid)
+            // ==========================================
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Pro Photo Tools Suite 📸",
+                        color = TextPrimary,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "PicsArt Pro Tools",
+                        color = RadiantPink,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Photo Tools Grid Rows
+                val photoToolsList = listOf(
+                    Triple("15 Filters", "Cinema & Retro", Icons.Default.Filter to RadiantPink),
+                    Triple("PicsArt Pro", "Double Exp & Splash", Icons.Default.AutoAwesome to ElectricBlue),
+                    Triple("BG Remover", "Instant Cutout", Icons.Default.Layers to Color(0xFF00E676)),
+                    Triple("Urdu Shayari 📜", "Love & Quotes", Icons.Default.FormatQuote to RadiantPink),
+                    Triple("Beautify", "Face & Skin Retouch", Icons.Default.Face to Color(0xFFFF4081)),
+                    Triple("Shapes & Frames", "Aesthetic Borders", Icons.Default.Crop to Color(0xFFFFD700)),
+                    Triple("Mask & Light", "Prism & Leaks", Icons.Default.ShowChart to DeepPurple),
+                    Triple("35+ Stickers", "Emojis & Badges", Icons.Default.EmojiEmotions to Color(0xFF00E5FF))
+                )
+
+                for (i in photoToolsList.indices step 2) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        for (j in 0..1) {
+                            val item = photoToolsList[i + j]
+                            GlassCard(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        if (item.first.contains("BG Remover")) onNavigateToRemoveBg()
+                                        else onOpenPhotoEditor(null)
+                                    },
+                                shape = RoundedCornerShape(18.dp),
+                                backgroundColor = CharcoalSurface
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(item.third.second.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = item.third.first,
+                                            contentDescription = item.first,
+                                            tint = item.third.second,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = item.first,
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = item.second,
+                                            color = TextMuted,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // ==========================================
+            // 1. Start New Project (Hero Card with AI Cyberpunk Girl Background)
+            // ==========================================
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+            ) {
             // Ambient animated background glow
             Box(
                 modifier = Modifier
@@ -873,6 +1501,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

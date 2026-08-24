@@ -305,8 +305,8 @@ fun AppNavigation(
                                             },
                                             onOpenDemoVideo = {
                                                 activeVcpProjectData = null
-                                                selectedVideoUri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4")
-                                                selectedVideoFileName = "Try_Demo_Video.mp4"
+                                                selectedVideoUri = com.example.engine.SampleVideoProvider.getOrCreateDemoVideoUri(context)
+                                                selectedVideoFileName = "VisionCut_Demo_Sample.mp4"
                                                 currentScreen = AppScreen.VIDEO_EDITOR
                                             }
                                         )
