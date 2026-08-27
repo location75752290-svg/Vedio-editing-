@@ -122,6 +122,12 @@ class VisionCutEngineViewModel(application: Application) : AndroidViewModel(appl
         _selectedClipId.value = clipId
     }
 
+    val masterTimeline: List<com.example.domain.model.TimelineClip> get() = engine.getMasterTimeline()
+
+    fun addToMasterTimeline(clip: com.example.domain.model.TimelineClip, showToast: (String) -> Unit = {}) {
+        engine.addToMasterTimeline(clip, showToast)
+    }
+
     fun undo() {
         engine.undo()
     }

@@ -25,21 +25,10 @@ android {
 
   signingConfigs {
     create("release") {
-      val envKeystorePath = System.getenv("KEYSTORE_PATH")
-      val keyFile = if (!envKeystorePath.isNullOrEmpty()) {
-        file(envKeystorePath)
-      } else if (file("${rootDir}/visioncutai_release.jks").exists()) {
-        file("${rootDir}/visioncutai_release.jks")
-      } else if (file("${rootDir}/my-upload-key.jks").exists()) {
-        file("${rootDir}/my-upload-key.jks")
-      } else {
-        file("${rootDir}/debug.keystore")
-      }
-
-      storeFile = keyFile
-      storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "VisionCut2026MasterKeyPass"
-      keyAlias = System.getenv("KEY_ALIAS") ?: "visioncutai_release"
-      keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: "VisionCut2026MasterKeyPass"
+      storeFile = file("${rootDir}/debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -51,8 +40,8 @@ android {
 
   buildTypes {
     release {
-      isMinifyEnabled = true
-      isShrinkResources = true
+      isMinifyEnabled = false
+      isShrinkResources = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }

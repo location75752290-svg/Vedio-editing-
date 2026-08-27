@@ -124,6 +124,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -474,7 +475,7 @@ fun PhotoEditorScreen(
         // Draw Text / Shayari if present
         if (textOverlay.isNotBlank()) {
             val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
+                color = textColor.toArgb()
                 textSize = (20f * textScale * scaleFactor).coerceAtLeast(16f)
                 textAlign = android.graphics.Paint.Align.CENTER
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -485,6 +486,25 @@ fun PhotoEditorScreen(
             val textCenterX = (targetWidth / 2f) + (textOffsetX * scaleFactor)
             val textCenterY = (targetHeight / 2f) + (textOffsetY * scaleFactor)
             canvas.rotate(textRotation, textCenterX, textCenterY)
+
+            if (hasTextBackground) {
+                val textBounds = android.graphics.Rect()
+                textPaint.getTextBounds(textOverlay, 0, textOverlay.length, textBounds)
+                val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.argb(140, 0, 0, 0)
+                    style = android.graphics.Paint.Style.FILL
+                }
+                val padX = 14f * scaleFactor
+                val padY = 8f * scaleFactor
+                val rectF = android.graphics.RectF(
+                    textCenterX - (textBounds.width() / 2f) - padX,
+                    textCenterY - textBounds.height() - padY,
+                    textCenterX + (textBounds.width() / 2f) + padX,
+                    textCenterY + padY
+                )
+                canvas.drawRoundRect(rectF, 10f * scaleFactor, 10f * scaleFactor, bgPaint)
+            }
+
             canvas.drawText(textOverlay, textCenterX, textCenterY, textPaint)
             canvas.restore()
         }
@@ -663,8 +683,24 @@ fun PhotoEditorScreen(
                 }
                 Button(
                     onClick = {
-                        pushState()
-                        Toast.makeText(context, "Applied changes!", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            if (selectedFilterId != "normal" || brightness != 0f || contrast != 0f || saturation != 0f || temperature != 0f) {
+                                val baked = renderOutputBitmap(export4K = false)
+                                if (baked != null) {
+                                    loadedBitmap = baked
+                                    selectedFilterId = "normal"
+                                    filterIntensity = 1.0f
+                                    brightness = 0f
+                                    contrast = 0f
+                                    saturation = 0f
+                                    temperature = 0f
+                                    pushState(baked)
+                                }
+                            } else {
+                                pushState()
+                            }
+                            Toast.makeText(context, "Applied changes!", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RadiantPink),
                     shape = RoundedCornerShape(18.dp),
@@ -697,6 +733,7 @@ fun PhotoEditorScreen(
                 BeforeAfterComparisonCanvas(
                     originalBitmap = orig,
                     processedBitmap = proc,
+                    activeColorMatrix = activeColorMatrix,
                     splitPosition = splitSliderPosition,
                     onSplitPositionChange = { splitSliderPosition = it },
                     floatingBadgeText = badgeText,
@@ -721,7 +758,13 @@ fun PhotoEditorScreen(
                     emojiOffsetX = emojiOffsetX,
                     emojiOffsetY = emojiOffsetY,
                     emojiScale = emojiScale,
-                    emojiRotation = emojiRotation
+                    emojiRotation = emojiRotation,
+                    onEmojiTransform = { dx, dy, zoom, rot ->
+                        emojiOffsetX += dx
+                        emojiOffsetY += dy
+                        emojiScale = (emojiScale * zoom).coerceIn(0.4f, 4.0f)
+                        emojiRotation += rot
+                    }
                 )
             } else {
                 // Upload Photo button when no photo is loaded
@@ -3391,6 +3434,7 @@ private fun ManualCutoutDialog(
 private fun BeforeAfterComparisonCanvas(
     originalBitmap: Bitmap,
     processedBitmap: Bitmap,
+    activeColorMatrix: androidx.compose.ui.graphics.ColorMatrix,
     splitPosition: Float,
     onSplitPositionChange: (Float) -> Unit,
     floatingBadgeText: String,
@@ -3411,6 +3455,7 @@ private fun BeforeAfterComparisonCanvas(
     emojiOffsetY: Float,
     emojiScale: Float,
     emojiRotation: Float,
+    onEmojiTransform: (Float, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current.density
@@ -3428,11 +3473,12 @@ private fun BeforeAfterComparisonCanvas(
         val splitXPx = (containerWidthPx * splitPosition).coerceIn(10f, containerWidthPx - 10f)
 
         if (!isSplitMode) {
-            // FULL SINGLE STRAIGHT PHOTO VIEW (NORMAL MODE)
+            // FULL SINGLE STRAIGHT PHOTO VIEW (NORMAL MODE) with real-time ColorMatrix filters & adjustments
             Image(
                 bitmap = processedBitmap.asImageBitmap(),
                 contentDescription = "Full Photo View",
                 contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.colorMatrix(activeColorMatrix),
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -3498,11 +3544,12 @@ private fun BeforeAfterComparisonCanvas(
             }
         } else {
             // SPLIT BEFORE/AFTER COMPARISON SLIDER MODE
-            // 1. Processed Bitmap on Right (Base layer)
+            // 1. Processed Bitmap on Right (Base layer) with filters
             Image(
                 bitmap = processedBitmap.asImageBitmap(),
                 contentDescription = "Processed Photo Canvas",
                 contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.colorMatrix(activeColorMatrix),
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -3642,6 +3689,7 @@ private fun BeforeAfterComparisonCanvas(
                                 bitmap = processedBitmap.asImageBitmap(),
                                 contentDescription = "Zoom After",
                                 contentScale = ContentScale.Crop,
+                                colorFilter = ColorFilter.colorMatrix(activeColorMatrix),
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -3674,6 +3722,31 @@ private fun BeforeAfterComparisonCanvas(
                     color = textColor,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        // Interactive Emoji / Sticker Overlay
+        if (overlayEmoji.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .offset(x = emojiOffsetX.dp, y = emojiOffsetY.dp)
+                    .graphicsLayer(
+                        scaleX = emojiScale,
+                        scaleY = emojiScale,
+                        rotationZ = emojiRotation
+                    )
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, rotation ->
+                            onEmojiTransform(pan.x / 2.5f, pan.y / 2.5f, zoom, rotation)
+                        }
+                    }
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = overlayEmoji,
+                    fontSize = 44.sp,
                     textAlign = TextAlign.Center
                 )
             }

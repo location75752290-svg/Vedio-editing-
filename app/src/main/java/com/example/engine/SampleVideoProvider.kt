@@ -27,6 +27,24 @@ object SampleVideoProvider {
     private const val TAG = "SampleVideoProvider"
     private const val SAMPLE_FILE_NAME = "visioncut_demo_sample.mp4"
 
+    fun getSampleVideoFile(context: Context): File {
+        val sampleFile = File(context.filesDir, SAMPLE_FILE_NAME)
+        if (sampleFile.exists() && sampleFile.length() > 5000) {
+            return sampleFile
+        }
+        return try {
+            generateLocalDemoVideo(context, sampleFile)
+            sampleFile
+        } catch (e: Exception) {
+            try {
+                createMinimalSampleVideo(context, sampleFile)
+            } catch (ex: Exception) {
+                // Ignore
+            }
+            sampleFile
+        }
+    }
+
     /**
      * Returns a valid, local URI for a sample video.
      * Generates a smooth 5-second 1080x1920 MP4 if not already present.
@@ -118,12 +136,8 @@ object SampleVideoProvider {
             }
 
             for (frameIndex in 0 until totalFrames) {
-                // Draw to input surface
-                val canvas: Canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    inputSurface.lockHardwareCanvas()
-                } else {
-                    inputSurface.lockCanvas(null)
-                }
+                // Draw to input surface safely using lockCanvas
+                val canvas: Canvas = inputSurface.lockCanvas(null)
 
                 val progress = frameIndex.toFloat() / totalFrames
                 val timeSec = frameIndex.toFloat() / frameRate
@@ -179,63 +193,78 @@ object SampleVideoProvider {
 
                 inputSurface.unlockCanvasAndPost(canvas)
 
-                // Drain Encoder output to Muxer
-                drainEncoder(encoder, muxer, bufferInfo, false) { idx, started ->
-                    trackIndex = idx
-                    muxerStarted = started
-                }
+                // Drain Encoder output to Muxer while retaining muxerStarted & trackIndex state
+                val (updatedTrackIdx, updatedMuxerStarted) = drainEncoder(
+                    encoder, muxer, bufferInfo, false, trackIndex, muxerStarted
+                )
+                trackIndex = updatedTrackIdx
+                muxerStarted = updatedMuxerStarted
             }
 
             // Signal End of Stream
             encoder.signalEndOfInputStream()
-            drainEncoder(encoder, muxer, bufferInfo, true) { idx, started ->
-                trackIndex = idx
-                muxerStarted = started
-            }
+            val (finalTrackIdx, finalMuxerStarted) = drainEncoder(
+                encoder, muxer, bufferInfo, true, trackIndex, muxerStarted
+            )
+            trackIndex = finalTrackIdx
+            muxerStarted = finalMuxerStarted
 
         } finally {
             try {
                 encoder.stop()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping encoder", e)
+            }
+            try {
                 encoder.release()
             } catch (e: Exception) {
-                Log.e(TAG, "Error stopping encoder", e)
+                Log.w(TAG, "Error releasing encoder", e)
             }
             try {
                 if (muxerStarted) {
                     muxer.stop()
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping muxer", e)
+            }
+            try {
                 muxer.release()
             } catch (e: Exception) {
-                Log.e(TAG, "Error stopping muxer", e)
+                Log.w(TAG, "Error releasing muxer", e)
             }
             try {
                 inputSurface.release()
             } catch (e: Exception) {
-                Log.e(TAG, "Error releasing surface", e)
+                Log.w(TAG, "Error releasing surface", e)
             }
         }
     }
 
-    private inline fun drainEncoder(
+    private fun drainEncoder(
         encoder: MediaCodec,
         muxer: MediaMuxer,
         bufferInfo: MediaCodec.BufferInfo,
         endOfStream: Boolean,
-        crossinline onMuxerUpdate: (trackIndex: Int, started: Boolean) -> Unit
-    ) {
-        var trackIdx = -1
-        var muxerStarted = false
+        initialTrackIndex: Int,
+        initialMuxerStarted: Boolean
+    ): Pair<Int, Boolean> {
+        var trackIdx = initialTrackIndex
+        var muxerStarted = initialMuxerStarted
+        var emptyCycles = 0
 
         while (true) {
             val status = encoder.dequeueOutputBuffer(bufferInfo, 10_000)
             if (status == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 if (!endOfStream) break
+                emptyCycles++
+                if (emptyCycles > 30) break
             } else if (status == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                val newFormat = encoder.outputFormat
-                trackIdx = muxer.addTrack(newFormat)
-                muxer.start()
-                muxerStarted = true
-                onMuxerUpdate(trackIdx, muxerStarted)
+                if (!muxerStarted) {
+                    val newFormat = encoder.outputFormat
+                    trackIdx = muxer.addTrack(newFormat)
+                    muxer.start()
+                    muxerStarted = true
+                }
             } else if (status >= 0) {
                 val encodedData = encoder.getOutputBuffer(status)
                 if (encodedData != null) {
@@ -254,6 +283,7 @@ object SampleVideoProvider {
                 }
             }
         }
+        return Pair(trackIdx, muxerStarted)
     }
 
     private fun createMinimalSampleVideo(context: Context, outputFile: File) {

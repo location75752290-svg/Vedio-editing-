@@ -66,6 +66,7 @@ fun CapCutTopBar(
     onResolutionClick: () -> Unit,
     onExportClick: () -> Unit,
     onSaveProjectClick: () -> Unit,
+    onAiDirectorClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -95,42 +96,77 @@ fun CapCutTopBar(
                 )
             }
 
-            // CapCut Resolution & FPS Selector Pill
-            Surface(
-                onClick = onResolutionClick,
-                shape = RoundedCornerShape(14.dp),
-                color = CharcoalSurfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder),
-                modifier = Modifier.testTag("capcut_resolution_pill")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // AI Director Button (Sparkle Icon)
+                if (onAiDirectorClick != null) {
+                    Surface(
+                        onClick = onAiDirectorClick,
+                        shape = RoundedCornerShape(14.dp),
+                        color = RadiantPink.copy(alpha = 0.22f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RadiantPink),
+                        modifier = Modifier.testTag("capcut_ai_director_btn")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "AI Director",
+                                tint = RadiantPink,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "AI Director",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // CapCut Resolution & FPS Selector Pill
+                Surface(
+                    onClick = onResolutionClick,
+                    shape = RoundedCornerShape(14.dp),
+                    color = CharcoalSurfaceVariant,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder),
+                    modifier = Modifier.testTag("capcut_resolution_pill")
                 ) {
-                    Text(
-                        text = "$selectedResolution",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "•",
-                        color = TextMuted,
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = "${selectedFps}fps",
-                        color = cyanAccent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Resolution Options",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "$selectedResolution",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "•",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                        Text(
+                            text = "${selectedFps}fps",
+                            color = cyanAccent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Resolution Options",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
@@ -270,15 +306,18 @@ fun CapCutResolutionDialog(
                     letterSpacing = 0.5.sp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                val resList = listOf("720p", "1080p", "2K QHD", "4K UHD", "4K HDR")
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("720p", "1080p", "4K UHD").forEach { res ->
+                    resList.forEach { res ->
                         val isSelected = selectedResolution.contains(res, ignoreCase = true)
                         Surface(
                             onClick = { onResolutionChange(res) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.width(90.dp),
                             shape = RoundedCornerShape(12.dp),
                             color = if (isSelected) ElectricBlue.copy(alpha = 0.2f) else CharcoalSurfaceVariant,
                             border = androidx.compose.foundation.BorderStroke(
@@ -293,7 +332,7 @@ fun CapCutResolutionDialog(
                                 Text(
                                     text = res,
                                     color = if (isSelected) ElectricBlue else Color.White,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
@@ -316,7 +355,7 @@ fun CapCutResolutionDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(24, 30, 60).forEach { fps ->
+                    listOf(24, 30, 60, 120).forEach { fps ->
                         val isSelected = selectedFps == fps
                         Surface(
                             onClick = { onFpsChange(fps) },
@@ -335,7 +374,7 @@ fun CapCutResolutionDialog(
                                 Text(
                                     text = "${fps} fps",
                                     color = if (isSelected) cyanAccent else Color.White,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
@@ -378,6 +417,77 @@ fun CapCutResolutionDialog(
                             uncheckedTrackColor = CharcoalSurface
                         )
                     )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Dynamic 4K Double Quality & File Size Info Card
+                val is4k = selectedResolution.contains("4K", ignoreCase = true)
+                val is2k = selectedResolution.contains("2K", ignoreCase = true)
+                val estimatedSizeMb = when {
+                    is4k && selectedFps >= 60 -> "280 MB (2.8x Double+ Master Size)"
+                    is4k -> "195 MB (2.2x Double Quality Size)"
+                    is2k -> "125 MB (1.5x HD Size)"
+                    selectedFps >= 60 -> "95 MB (60fps Smooth)"
+                    else -> "65 MB (Standard 1080p)"
+                }
+                val bitrateText = when {
+                    is4k && selectedFps >= 120 -> "120 Mbps • HEVC Ultra Lossless"
+                    is4k && selectedFps >= 60 -> "85 Mbps • 4K Master 10-bit"
+                    is4k -> "60 Mbps • 4K Ultra HD"
+                    is2k -> "35 Mbps • 2K QHD"
+                    else -> "15 - 22 Mbps • H.264 AVC"
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (is4k) cyanAccent.copy(alpha = 0.12f) else CharcoalSurfaceVariant,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (is4k) cyanAccent.copy(alpha = 0.4f) else GlassBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(if (is4k) cyanAccent.copy(alpha = 0.25f) else ElectricBlue.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (is4k) Icons.Default.HighQuality else Icons.Default.SdStorage,
+                                contentDescription = null,
+                                tint = if (is4k) cyanAccent else ElectricBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = if (is4k) "4K Double-Size Ultra HD" else "Estimated File Size",
+                                    color = if (is4k) cyanAccent else Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (is4k) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = goldAccent.copy(alpha = 0.25f)
+                                    ) {
+                                        Text("MASTER 4K", color = goldAccent, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                    }
+                                }
+                            }
+                            Text(
+                                text = "Est: ~$estimatedSizeMb • $bitrateText",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -456,6 +566,11 @@ fun CapCutClipSubToolbar(
     onReverseClick: () -> Unit,
     onFreezeClick: () -> Unit,
     onAiProClick: () -> Unit,
+    onNewtonClick: () -> Unit = {},
+    onWatermarkClick: () -> Unit = {},
+    onSpatial3DClick: () -> Unit = {},
+    onStemSplitterClick: () -> Unit = {},
+    onHollywoodLutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -493,6 +608,11 @@ fun CapCutClipSubToolbar(
 
             // Sub-tools
             CapCutToolbarIconButton("Split", Icons.Default.ContentCut, null, false, RadiantPink, onSplitClick)
+            CapCutToolbarIconButton("Watermark", Icons.Default.AutoAwesome, "AI", false, RadiantPink, onWatermarkClick)
+            CapCutToolbarIconButton("3D Spatial", Icons.Default.Layers, "PRO", false, cyanAccent, onSpatial3DClick)
+            CapCutToolbarIconButton("Stem Audio", Icons.Default.GraphicEq, "AI", false, Color(0xFF00E676), onStemSplitterClick)
+            CapCutToolbarIconButton("Hollywood", Icons.Default.MovieFilter, "LUT", false, goldAccent, onHollywoodLutClick)
+            CapCutToolbarIconButton("Newton's", Icons.Default.GraphicEq, "PRO", false, cyanAccent, onNewtonClick)
             CapCutToolbarIconButton("Speed", Icons.Default.Speed, null, false, ElectricBlue, onSpeedClick)
             CapCutToolbarIconButton("Volume", Icons.Default.VolumeUp, null, false, cyanAccent, onVolumeClick)
             CapCutToolbarIconButton("Cutout", Icons.Default.BlurLinear, null, false, Color(0xFF00E676), onCutoutClick)

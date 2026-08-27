@@ -88,8 +88,8 @@ data class Keyframe(
 data class TimelineClip(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
-    val startMs: Long,
-    val durationMs: Long,
+    val startMs: Long = 0,
+    val durationMs: Long = 5000,
     val assetUri: String = "",
     val speed: Float = 1.0f,
     val isReversed: Boolean = false,
@@ -120,6 +120,8 @@ data class TimelineClip(
     val rotationDegrees: Float = 0f,
     val keyframes: List<Keyframe> = emptyList()
 )
+
+typealias VideoClip = TimelineClip
 
 data class TimelineTrack(
     val id: String = UUID.randomUUID().toString(),

@@ -2336,7 +2336,7 @@ fun HomeScreen(
                     GlassCard(
                         modifier = Modifier
                             .width(220.dp)
-                            .clickable { showProjectSheet = true },
+                            .clickable { onOpenDemoVideo() },
                         shape = RoundedCornerShape(20.dp)
                     ) {
                         Column {
@@ -2706,7 +2706,10 @@ fun HomeScreen(
                 GlassCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
-                    onClick = { showProjectSheet = false }
+                    onClick = {
+                        showProjectSheet = false
+                        onNavigateToAiTools()
+                    }
                 ) {
                     Row(
                         modifier = Modifier

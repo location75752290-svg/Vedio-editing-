@@ -10,6 +10,7 @@ import com.example.domain.model.ExportRecord
 import com.example.domain.model.SharePlatform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -43,23 +44,43 @@ class MediaCodecVideoExporter(private val context: Context) {
     ): Flow<ExportRenderProgress> = flow {
         emit(ExportRenderProgress(0f, "Initializing Android MediaCodec hardware encoder..."))
 
+        // Check device thermal status for cooling protection
+        val deviceTemp = DeviceThermalEngine.getDeviceTemperature(context)
+        DeviceThermalEngine.evaluateThermalCooling(deviceTemp) { msg ->
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
         // Determine resolution dimensions
-        val (width, height) = parseResolution(resolutionStr, platform.defaultAspectRatio)
+        val effectiveResStr = if (deviceTemp > 42.0f) "1080p 60fps" else resolutionStr
+        val (width, height) = parseResolution(effectiveResStr, platform.defaultAspectRatio)
         val framerate = parseFramerate(framerateStr)
+        val is4kOrHigher = width >= 2160 || height >= 2160
+        val is60FpsOrHigher = framerate >= 60
 
-        emit(ExportRenderProgress(0.1f, "Configuring H.264 / AVC Encoder ($width x $height @ ${framerate}fps)..."))
-        delay(300)
+        val targetBitrate = when {
+            is4kOrHigher && framerate >= 120 -> 120_000_000 // 120 Mbps for 4K 120fps Master
+            is4kOrHigher && is60FpsOrHigher -> 85_000_000   // 85 Mbps for 4K 60fps Ultra HD
+            is4kOrHigher -> 60_000_000                      // 60 Mbps for 4K 30fps
+            width >= 1440 || height >= 1440 -> 35_000_000   // 35 Mbps for 2K QHD
+            is60FpsOrHigher -> 22_000_000                   // 22 Mbps for 1080p 60fps
+            else -> 15_000_000                              // 15 Mbps standard
+        }
 
-        // Configure MediaFormat for MediaCodec
-        val mime = MediaFormat.MIMETYPE_VIDEO_AVC
+        emit(ExportRenderProgress(0.1f, "Configuring CapCut Pro 4K UHD Encoder ($width x $height @ ${framerate}fps • ${(targetBitrate / 1_000_000)} Mbps)..."))
+        delay(250)
+
+        // Configure MediaFormat for MediaCodec with Ultra HD Profile
+        val mime = if (is4kOrHigher) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
         val format = MediaFormat.createVideoFormat(mime, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 15_000_000) // 15 Mbps
+            setInteger(MediaFormat.KEY_BIT_RATE, targetBitrate)
             setInteger(MediaFormat.KEY_FRAME_RATE, framerate)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
 
-        emit(ExportRenderProgress(0.25f, "Synthesizing timeline video frames & multi-track audio..."))
+        emit(ExportRenderProgress(0.25f, "Synthesizing 4K Ultra HD frames, multi-track audio & physics dynamics..."))
 
         // Simulate frame encoding loop
         val totalFrames = (durationSeconds * framerate).toInt().coerceAtLeast(30)
@@ -81,6 +102,15 @@ class MediaCodecVideoExporter(private val context: Context) {
         emit(ExportRenderProgress(0.96f, "Saving exported file to MediaStore & Android Gallery..."))
         delay(300)
 
+        val sizeMultiplier = when {
+            is4kOrHigher && framerate >= 60 -> 2.8f // Double+ Ultra Size for 4K 60fps+
+            is4kOrHigher -> 2.2f                    // Double Size for 4K 30fps Ultra HD
+            width >= 1440 || height >= 1440 -> 1.5f // 2K QHD
+            is60FpsOrHigher -> 1.35f                // 1080p 60fps
+            else -> 1.0f                            // 1080p Standard
+        }
+        val calculatedFileSizeMb = ((targetBitrate / 8.0f / 1_000_000.0f) * durationSeconds * 1.05f).coerceAtLeast(15.0f * sizeMultiplier)
+
         val record = ExportRecord(
             id = "exp_${System.currentTimeMillis()}",
             timestampMs = System.currentTimeMillis(),
@@ -89,7 +119,7 @@ class MediaCodecVideoExporter(private val context: Context) {
             resolution = resolutionStr,
             framerate = framerateStr,
             durationSeconds = durationSeconds,
-            fileSizeMb = (totalFrames * 0.15f).coerceAtLeast(12.5f),
+            fileSizeMb = calculatedFileSizeMb,
             fileUri = outputFile.absolutePath
         )
 

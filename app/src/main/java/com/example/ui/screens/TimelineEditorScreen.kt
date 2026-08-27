@@ -251,6 +251,12 @@ fun TimelineEditorScreen(
         isExporting = true
         exportProgress = 0f
         exportStatusText = "Initializing MediaCodec Hardware Engine..."
+        com.example.engine.RenderQueue.add(
+            com.example.engine.RenderJob(
+                title = "$exportResolution Export",
+                durationSeconds = totalDurationSec
+            )
+        )
         val exporter = MediaCodecVideoExporter(context)
         val repository = VisionCutRepository(context)
         coroutineScope.launch {

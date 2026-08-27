@@ -191,6 +191,18 @@ class VideoEditorEngine {
     }
 
     // --- CLIP IMPORT & SPLIT & DELETE ---
+    private val masterTimeline = mutableListOf<TimelineClip>()
+    fun getMasterTimeline(): List<TimelineClip> = masterTimeline.toList()
+
+    fun addToMasterTimeline(clip: TimelineClip, showToast: (String) -> Unit = {}) {
+        pushState()
+        masterTimeline.add(clip)
+        importClip(TrackType.VIDEO, clip.name, clip.assetUri, clip.durationMs)
+        if (masterTimeline.size == 3) {
+            showToast("3 Clips Added. Tap AI Generate for Final Render")
+        }
+    }
+
     fun importClip(trackType: TrackType, clipName: String, uri: String = "", durationMs: Long = 5000L) {
         pushState()
         val currentTracks = _tracks.value.toMutableList()

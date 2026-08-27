@@ -271,11 +271,14 @@ fun AppNavigation(
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
-                            AnimatedContent(
-                                targetState = currentNavTab,
-                                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                                label = "tab_transition"
-                            ) { tab ->
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                com.example.ui.components.RenderQueueNotificationBar()
+                                Box(modifier = Modifier.weight(1f)) {
+                                    AnimatedContent(
+                                        targetState = currentNavTab,
+                                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                                        label = "tab_transition"
+                                    ) { tab ->
                                 when (tab) {
                                     NavTab.HOME -> {
                                         HomeScreen(
@@ -315,9 +318,12 @@ fun AppNavigation(
                                     NavTab.TEMPLATES -> {
                                         TemplatesScreen(
                                             onUseTemplate = { template ->
-                                                currentScreen = AppScreen.EDITOR
+                                                activeVcpProjectData = null
+                                                selectedVideoUri = com.example.engine.SampleVideoProvider.getOrCreateDemoVideoUri(context)
+                                                selectedVideoFileName = "${template.title}.mp4"
+                                                currentScreen = AppScreen.VIDEO_EDITOR
                                                 scope.launch {
-                                                    snackbarHostState.showSnackbar("Loaded template into Timeline: ${template.title}")
+                                                    snackbarHostState.showSnackbar("Loaded template: ${template.title} in Video Studio")
                                                 }
                                             }
                                         )
@@ -325,7 +331,16 @@ fun AppNavigation(
 
                                     NavTab.AI_TOOLS -> {
                                         AiToolsScreen(
-                                            onOpenRemoveBg = { currentScreen = AppScreen.REMOVE_BG }
+                                            onOpenRemoveBg = { currentScreen = AppScreen.REMOVE_BG },
+                                            onOpenVideoEditor = { uri, fileName ->
+                                                activeVcpProjectData = null
+                                                selectedVideoUri = uri
+                                                selectedVideoFileName = fileName
+                                                currentScreen = AppScreen.VIDEO_EDITOR
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar("Opened $fileName in Video Studio")
+                                                }
+                                            }
                                         )
                                     }
 
@@ -362,6 +377,8 @@ fun AppNavigation(
                         }
                     }
                 }
+            }
+        }
 
                 AppScreen.EDITOR -> {
                     TimelineEditorScreen(
