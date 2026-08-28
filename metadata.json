@@ -1,6 +1,6 @@
 {
-  "name": "VisionCutAI - Video Editor",
-  "description": "Premium AI Video Editor with AI Background Remover, Green Screen, Auto Captions, Keyframes, and Project Save/Load",
+  "name": "StoryForge",
+  "description": "CapCut-style AI Video Editing App with Multi-Track Timeline, Auto Captions, Background Remover, Newton Dynamics & 4K Background Exporter",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
